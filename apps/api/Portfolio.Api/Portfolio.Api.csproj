@@ -17,8 +17,8 @@
     <!--
       Design-time tooling for `dotnet ef`. Lives in the startup
       project (this one) by convention rather than in Infrastructure,
-      which is where the actual DbContext lives - dotnet-ef is pointed
-      at both via --project/--startup-project flags.
+      which is where the actual DbContext lives. dotnet-ef is pointed
+      at both via the project and startup-project flags.
     -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
