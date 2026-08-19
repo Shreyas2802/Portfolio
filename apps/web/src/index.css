@@ -1,12 +1,39 @@
 @import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 
 /*
-  Design tokens will live here as the design system takes shape in
-  Phase 1. For now this just pulls in Tailwind's base layer so the
-  health-check shell can be styled.
+  Design tokens — Phase 1.
+
+  Palette: near-black canvas + warm off-white text + one desaturated
+  brass accent, used sparingly. The site deliberately does NOT commit
+  to a single photographic mood (moody/airy/warm) because the work
+  itself spans genres — the chrome stays neutral and quiet so photos
+  carry the mood, not the UI.
+
+  Two type roles:
+  - --font-display: Inter, set with a tight tracking at large sizes,
+    for headings and body copy.
+  - --font-mono: JetBrains Mono, reserved for technical/data labels
+    (camera settings, coordinates, timestamps) — the signature device
+    that ties the "photographer" and "developer" halves of the site
+    together instead of treating them as separate sections.
 */
 @theme {
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-canvas: #0b0b0d;
+  --color-canvas-raised: #141416;
+  --color-ink: #f2f0eb;
+  --color-ink-muted: #a3a19c;
+  --color-line: #232326;
+  --color-brass: #b08d57;
+  --color-brass-dim: #8a6f45;
 }
 
 html, body, #root {
@@ -14,5 +41,33 @@ html, body, #root {
 }
 
 body {
-  @apply bg-neutral-950 text-neutral-100 antialiased;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible keyboard focus everywhere — never suppressed. */
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utility class for the EXIF-style technical labels used throughout. */
+.data-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  color: var(--color-ink-muted);
 }
