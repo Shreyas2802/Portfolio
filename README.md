@@ -8,8 +8,8 @@ the architecture and the original spec for the full plan.
 
 ## Prerequisites
 - Node.js 20+ and npm
-- .NET SDK 10 (or whatever the current LTS is when you set this up —
-  check with `dotnet --version`)
+- .NET SDK 9 (matches the `net9.0` target in the `.csproj` files —
+  check with `dotnet --version`; bump both together if you upgrade)
 - Git
 
 ## Running locally
