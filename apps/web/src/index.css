@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/*
+  Design tokens will live here as the design system takes shape in
+  Phase 1. For now this just pulls in Tailwind's base layer so the
+  health-check shell can be styled.
+*/
+@theme {
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100 antialiased;
+}

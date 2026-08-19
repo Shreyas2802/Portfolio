@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Portfolio.Domain\Portfolio.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    Application holds use cases / business logic (e.g. "publish a
+    photo", "create an album") and defines interfaces that
+    Infrastructure implements (e.g. IPhotoRepository, IImageProcessor).
+    It depends on Domain but never on Infrastructure or the Api layer -
+    that's what keeps business logic out of both the database and the
+    controllers (spec principle #7).
+  -->
+
+</Project>

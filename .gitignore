@@ -1,0 +1,28 @@
+# --- Node / frontend ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# --- .NET / backend ---
+bin/
+obj/
+*.user
+*.suo
+appsettings.*.local.json
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Uploads (local dev only - never commit real media) ---
+apps/api/Portfolio.Api/uploads/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

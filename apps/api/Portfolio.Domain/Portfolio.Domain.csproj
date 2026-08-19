@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    The Domain project has NO dependencies on anything else in the
+    solution or on any framework (no EF Core, no ASP.NET Core). This
+    is deliberate: entities, enums, and value objects here describe
+    business concepts only. Nothing about "how it's stored" or "how
+    it's served over HTTP" belongs in this project.
+  -->
+
+</Project>
