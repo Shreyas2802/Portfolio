@@ -13,4 +13,17 @@
     <ProjectReference Include="..\Portfolio.Infrastructure\Portfolio.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Design-time tooling for `dotnet ef`. Lives in the startup
+      project (this one) by convention rather than in Infrastructure,
+      which is where the actual DbContext lives - dotnet-ef is pointed
+      at both via --project/--startup-project flags.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
 </Project>

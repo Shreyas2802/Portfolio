@@ -66,3 +66,32 @@ shared `RootLayout` (header/footer) wrapping all routes.
 **Why:** every page needs the same header/footer; centralizing it
 avoids duplicating layout markup per-page, and keeps route-level
 components focused on their own content only.
+
+---
+
+## Phase 2 — ASP.NET Core foundation (EF Core, SQL Server, error handling)
+**Decision:** `SiteSettings` (from the spec's own domain model) as the
+first real Domain entity, rather than jumping straight to Photo/Album.
+**Why:** Photo and Album need image upload/processing (Phase 5) to be
+meaningful - adding them now would mean a DbSet nothing populates.
+SiteSettings is simple, already in the spec, and is enough to prove
+Domain → Infrastructure → EF Core → SQL Server works end to end before
+anything harder is layered on.
+
+**Decision:** SQL Server LocalDB for local dev
+(`(localdb)\MSSQLLocalDB`), trusted/Windows connection - no password
+in the connection string.
+**Why:** matches what's actually installed on this machine, and
+Windows-integrated auth means there's no credential to accidentally
+leak even though the connection string is committed. This connection
+string is dev-only; a production connection string must come from
+environment variables or a secrets store, never committed - see
+`appsettings.Production.json` (gitignored) when that's introduced in
+Phase 10.
+
+**Decision:** `AddProblemDetails()` + `UseDeveloperExceptionPage()` in
+dev / `UseExceptionHandler()` otherwise, added now rather than in
+Phase 7 (Hardening).
+**Why:** it's a few lines and costs nothing to have on from the start;
+retrofitting error handling after controllers exist is more error-prone
+than starting with it.

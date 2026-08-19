@@ -29,21 +29,43 @@ dotnet build
 dotnet run --project Portfolio.Api   # http://localhost:5199
 ```
 
+### Database (first time, or after pulling new migrations)
+Requires the `dotnet-ef` tool (`dotnet tool install --global dotnet-ef`
+if you don't have it) and SQL Server LocalDB (ships with Visual
+Studio).
+```bash
+cd apps/api
+dotnet ef database update --project Portfolio.Infrastructure --startup-project Portfolio.Api
+```
+This creates the `PortfolioDb` database in LocalDB and applies all
+migrations. After this, `GET /api/health` should report
+`"database": "connected"`.
+
+To add a new migration after changing entities:
+```bash
+dotnet ef migrations add <DescriptiveName> --project Portfolio.Infrastructure --startup-project Portfolio.Api
+```
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and
 `apps/api/Portfolio.Api/Properties/launchSettings.json` if you change
 ports).
 
-## Verifying Phase 0
+## Verifying the setup
 ```bash
 # frontend
 cd apps/web && npm run lint && npm run build
 
 # backend
 cd apps/api && dotnet build
+
+# database
+cd apps/api && dotnet ef database update --project Portfolio.Infrastructure --startup-project Portfolio.Api
 ```
-Both should complete with no errors before moving to Phase 1.
+All three should complete with no errors. Then `dotnet run --project
+Portfolio.Api` and check `GET http://localhost:5199/api/health` shows
+`"database": "connected"`.
 
 ## Project layout
 ```text

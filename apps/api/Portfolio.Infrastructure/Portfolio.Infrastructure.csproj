@@ -12,11 +12,15 @@
     <ProjectReference Include="..\Portfolio.Application\Portfolio.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+  </ItemGroup>
+
   <!--
-    EF Core, ASP.NET Core Identity, SkiaSharp, MetadataExtractor, and
-    filesystem storage code all live here in later phases. None of it
-    is referenced yet - Phase 0 only needs the project to exist and
-    compile so the solution structure is real from day one.
+    ASP.NET Core Identity, SkiaSharp, MetadataExtractor, and filesystem
+    storage code arrive in later phases (Identity in Phase 6, image
+    processing in Phase 5). EF Core + SQL Server land now (Phase 2) so
+    the migrations pipeline exists before any real domain model does.
   -->
 
 </Project>
