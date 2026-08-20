@@ -177,7 +177,6 @@ to scroll. Cause: the image's flex container had no `min-height: 0`,
 so its default `min-height: auto` let it grow to the image's full
 intrinsic height instead of shrinking to the available space -
 `max-height: 100%` on the `<img>` can't help if the container itself
-never shrinks. Fixed with `min-h-0` on the container, an explicit
-`max-h-[calc(100vh-12rem)]` on the image (more reliable than a
-percentage-based max-height here), and `overflow-auto` on the
-container as a fallback for any edge case both of those miss.
+never shrinks. Fixed with a single `min-h-0` added to the existing
+container class - no structural change needed, since `max-h-full` on
+the image already worked correctly once the container could shrink.
