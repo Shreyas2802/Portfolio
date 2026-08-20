@@ -126,3 +126,48 @@ rather than a database-backed download.
 **Why:** it's one file that changes infrequently; a static asset is
 simpler than adding upload/versioning machinery for something this
 low-frequency.
+
+---
+
+## Phase 4 — Photography (Photo/Album/Category, gallery, lightbox)
+**Decision:** Real photos (11 shots from a Ganesh Chaturthi night
+shooting Pune's well-known Ganpati mandals - Kasba Ganapati, Tambdi
+Jogeshwari, Dagdusheth Halwai, and others) with real extracted EXIF
+(Sony A6000, two lenses), seeded via a dev-only `DbSeeder`, instead of
+placeholder images.
+**Why:** the point of this site is to be a real demonstration, not a
+mockup - and the DataLabel device is only meaningful if the numbers it
+shows are real.
+
+**Decision:** Hand-generated thumb/medium/large JPEG variants
+(480/1200/2400px), stripped of EXIF on the served files, checked into
+`wwwroot/uploads/photos/` - rather than building the full upload/
+variant-generation pipeline now.
+**Why:** that pipeline is explicitly Phase 5's scope (upload endpoint,
+validation, variant generation, storage abstraction). Building it now
+would mean building it twice. The `Photo` entity's shape doesn't
+change when Phase 5 lands - it'll populate these same
+Thumbnail/Medium/LargePath fields via the real pipeline instead of the
+seeder.
+
+**Decision:** EXIF stripped from the *served* image files; the same
+data lives in the `Photo` entity instead and is rendered back out
+explicitly via the DataLabel component.
+**Why:** serving files with embedded GPS/camera metadata leaks more
+than intended (anyone can extract it from the raw file) and can't be
+selectively hidden per-field. Keeping it in the database means the
+site controls exactly what's shown and could redact it entirely later
+without re-processing images.
+
+**Decision:** `PhotographyController` is GET-only; no create/update/
+delete endpoints yet.
+**Why:** write operations need authentication, which doesn't exist
+until Phase 6 (Identity, Login, Authorization). An unauthenticated
+write endpoint would be a real vulnerability, not just incomplete -
+so it simply doesn't exist yet rather than existing insecurely.
+
+**Decision:** Custom Lightbox component (portal-rendered, Escape/
+arrow-key navigation, basic focus handling) instead of a UI library.
+**Why:** no new dependency for something this contained, and it needed
+to match the site's specific visual language (DataLabel EXIF footer)
+that a generic library wouldn't provide out of the box.
