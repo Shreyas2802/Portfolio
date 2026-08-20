@@ -173,10 +173,10 @@ to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
 
 **Decision:** Lightbox is full-bleed - the photo fills the entire
-viewport (`object-contain` against `100% × 100%`), and all chrome
-(close button, counter, caption, EXIF, full-resolution link) is an
-absolutely positioned overlay with a gradient scrim, not separate
-header/footer rows.
+viewport (against `100% × 100%`), and all chrome (close button,
+counter, caption, EXIF, full-resolution link) is an absolutely
+positioned overlay with a gradient scrim, not separate header/footer
+rows.
 **Why:** matches the reference layout the user pointed to (a
 commercial gallery script, X3 Photo Gallery / Imagevue - not cloned
 directly, but the underlying pattern is standard). Stacked header/
@@ -184,8 +184,15 @@ image/footer rows each claim a fixed slice of vertical space and
 shrink the photo itself; overlaying the chrome on top of a full-bleed
 image gives the photo nearly the entire viewport regardless of
 orientation, which is what makes portrait and landscape both feel
-immersive without needing separate handling. Replaced the earlier
-click-to-zoom toggle with a plain "view full resolution" link that
-opens the large variant in a new tab - simpler, and this layout leaves
-less need for in-place zooming since the photo is already using all
-the space it can.
+immersive without needing separate handling.
+
+**Decision:** Within that full-bleed layout, the photo starts
+fit-to-screen (`object-contain`, whole photo visible, letterboxed on
+one axis) and clicking it toggles to fill-screen (`object-cover`,
+edge-to-edge, cropping overflow on one axis). State resets to fit on
+navigating to another photo.
+**Why:** preference - gives an immersive full-screen option on demand
+without losing the safer default of always seeing the whole photo
+first. A separate "view full resolution" new-tab link stays available
+for inspecting actual pixel detail, which fit/fill alone don't
+provide.

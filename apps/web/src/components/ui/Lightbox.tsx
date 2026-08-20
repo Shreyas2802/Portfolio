@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Photo } from '../../features/photography/types'
 import { formatExif, formatCamera } from '../../features/photography/formatExif'
@@ -31,7 +31,18 @@ interface LightboxProps {
 export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
+  const [isFilled, setIsFilled] = useState(false)
+  const [lastIndex, setLastIndex] = useState(activeIndex)
   const photo = photos[activeIndex]
+
+  // Reset the fill toggle whenever the photo changes, so navigating
+  // never carries a filled/cropped state over to the next image.
+  // Adjusting state during render (rather than in an effect) avoids
+  // an extra render pass - see https://react.dev/learn/you-might-not-need-an-effect
+  if (activeIndex !== lastIndex) {
+    setLastIndex(activeIndex)
+    setIsFilled(false)
+  }
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement
@@ -70,13 +81,21 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
       className="fixed inset-0 z-50 bg-black"
       onClick={onClose}
     >
-      {/* The photo itself - full-bleed, edge to edge on whichever
-          dimension it's constrained by. */}
-      <img
-        src={photo.largeUrl}
-        alt={photo.caption || photo.title}
-        className="absolute inset-0 h-full w-full object-contain"
-      />
+      {/* The photo itself - click to toggle between fit (whole photo
+          visible, letterboxed on one axis) and fill (edge-to-edge,
+          cropping overflow on one axis). Starts in fit mode. */}
+      <button
+        type="button"
+        onClick={() => setIsFilled((f) => !f)}
+        aria-label={isFilled ? 'Fit photo to screen' : 'Fill screen with photo'}
+        className="absolute inset-0"
+      >
+        <img
+          src={photo.largeUrl}
+          alt={photo.caption || photo.title}
+          className={`h-full w-full ${isFilled ? 'object-cover' : 'object-contain'}`}
+        />
+      </button>
 
       {/* Top scrim + controls */}
       <div
@@ -107,14 +126,19 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
             {camera && <p className="data-label text-white/60">{camera}</p>}
           </div>
         </div>
-        <a
-          href={photo.largeUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="data-label whitespace-nowrap text-white/70 hover:text-[var(--color-brass)]"
-        >
-          View full resolution ↗
-        </a>
+        <div className="flex flex-col items-end gap-1">
+          <p className="data-label text-white/50">
+            {isFilled ? 'Click photo to fit screen' : 'Click photo to fill screen'}
+          </p>
+          <a
+            href={photo.largeUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="data-label whitespace-nowrap text-white/70 hover:text-[var(--color-brass)]"
+          >
+            View full resolution ↗
+          </a>
+        </div>
       </div>
 
       {activeIndex > 0 && (
