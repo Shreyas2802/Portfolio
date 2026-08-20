@@ -172,11 +172,15 @@ arrow-key navigation, basic focus handling) instead of a UI library.
 to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
 
-**Fix:** portrait photos overflowed the lightbox viewport with no way
-to scroll. Cause: the image's flex container had no `min-height: 0`,
-so its default `min-height: auto` let it grow to the image's full
-intrinsic height instead of shrinking to the available space -
-`max-height: 100%` on the `<img>` can't help if the container itself
-never shrinks. Fixed with a single `min-h-0` added to the existing
-container class - no structural change needed, since `max-h-full` on
-the image already worked correctly once the container could shrink.
+**Decision:** Photos open at their natural rendered size in the
+lightbox (no shrink-to-fit), with the container scrolling for
+anything taller or wider than the viewport - rather than constraining
+every photo to fit on screen.
+**Why:** preference - seeing the photo at full size with a scrollbar
+was the wanted behavior over always-fit. Implemented with `margin:
+auto` on the image (not `align-items: center` on the flex container) -
+that combination centers the image the same way when it fits, but
+avoids a real flexbox bug where `overflow: auto` + `align-items:
+center` makes the top of an oversized centered item unreachable by
+scrolling. `margin: auto` degrades to normal top-aligned scroll
+instead.
