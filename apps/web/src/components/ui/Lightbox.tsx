@@ -33,6 +33,7 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
   const previouslyFocused = useRef<HTMLElement | null>(null)
   const [isFilled, setIsFilled] = useState(false)
   const [lastIndex, setLastIndex] = useState(activeIndex)
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false)
   const photo = photos[activeIndex]
 
   // Reset the fill toggle whenever the photo changes, so navigating
@@ -43,6 +44,22 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
     setLastIndex(activeIndex)
     setIsFilled(false)
   }
+
+  // F11 browser fullscreen doesn't fire the Fullscreen API's
+  // fullscreenchange event (that's only for element.requestFullscreen()
+  // calls) - the standard way to detect it is comparing the viewport
+  // to the screen size, since F11 hides the browser chrome (address
+  // bar, tabs) without those APIs being involved at all.
+  useEffect(() => {
+    function checkFullscreen() {
+      setIsBrowserFullscreen(
+        window.innerWidth === window.screen.width && window.innerHeight === window.screen.height,
+      )
+    }
+    checkFullscreen()
+    window.addEventListener('resize', checkFullscreen)
+    return () => window.removeEventListener('resize', checkFullscreen)
+  }, [])
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement
@@ -113,33 +130,37 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
         </button>
       </div>
 
-      {/* Bottom scrim + caption/EXIF */}
-      <div
-        className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 sm:px-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div>
-          <p className="text-white">{photo.title}</p>
-          {photo.caption && <p className="text-sm text-white/70">{photo.caption}</p>}
-          <div className="mt-2 flex flex-wrap items-center gap-4">
-            {exif.length > 0 && <DataLabel items={exif} />}
-            {camera && <p className="data-label text-white/60">{camera}</p>}
+      {/* Bottom scrim + caption/EXIF - hidden in F11 browser
+          fullscreen, where the point is an unobstructed view of the
+          photo rather than continued chrome. */}
+      {!isBrowserFullscreen && (
+        <div
+          className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 sm:px-10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div>
+            <p className="text-white">{photo.title}</p>
+            {photo.caption && <p className="text-sm text-white/70">{photo.caption}</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              {exif.length > 0 && <DataLabel items={exif} />}
+              {camera && <p className="data-label text-white/60">{camera}</p>}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <p className="data-label text-white/50">
+              {isFilled ? 'Click photo to fit screen' : 'Click photo to fill screen'}
+            </p>
+            <a
+              href={photo.largeUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="data-label whitespace-nowrap text-white/70 hover:text-[var(--color-brass)]"
+            >
+              View full resolution ↗
+            </a>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <p className="data-label text-white/50">
-            {isFilled ? 'Click photo to fit screen' : 'Click photo to fill screen'}
-          </p>
-          <a
-            href={photo.largeUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="data-label whitespace-nowrap text-white/70 hover:text-[var(--color-brass)]"
-          >
-            View full resolution ↗
-          </a>
-        </div>
-      </div>
+      )}
 
       {activeIndex > 0 && (
         <button

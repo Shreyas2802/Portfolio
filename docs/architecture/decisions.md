@@ -196,3 +196,14 @@ without losing the safer default of always seeing the whole photo
 first. A separate "view full resolution" new-tab link stays available
 for inspecting actual pixel detail, which fit/fill alone don't
 provide.
+
+**Decision:** When the browser is in F11 (native OS-level) fullscreen,
+the bottom scrim - caption, EXIF, fill hint, full-resolution link - is
+hidden entirely; only the top counter/close controls remain.
+**Why:** the point of pressing F11 is an unobstructed view of the
+photo, so keeping the same chrome up defeats that. F11 fullscreen
+doesn't fire the Fullscreen API's `fullscreenchange` event (that only
+covers `element.requestFullscreen()` calls) - detected instead by
+comparing `window.innerWidth/innerHeight` to `window.screen.width/
+height` on resize, the standard technique since F11 hides browser
+chrome without involving the Fullscreen API at all.
