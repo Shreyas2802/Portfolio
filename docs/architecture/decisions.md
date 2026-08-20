@@ -172,17 +172,20 @@ arrow-key navigation, basic focus handling) instead of a UI library.
 to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
 
-**Decision:** Lightbox defaults to fit-to-screen (`object-contain`
-within the available space) for every photo regardless of
-orientation, with a click-to-zoom toggle that switches to a scrollable
-full-resolution view.
-**Why:** this is the standard pattern real photo sites use (Google
-Photos, Unsplash, Behance) - fit view keeps the presentation clean for
-browsing, and zoom lets high-resolution work actually be inspected in
-detail on request. It also makes a portrait/landscape tab switch
-unnecessary: fit-to-screen already treats both orientations
-identically, so there's nothing for tabs to solve. Reaching this took
-a few iterations - see the `min-h-0` explanation in the component
-itself for the underlying flexbox issue that motivated always keeping
-the image area's height properly capped, in both the fit and zoomed
-states.
+**Decision:** Lightbox is full-bleed - the photo fills the entire
+viewport (`object-contain` against `100% × 100%`), and all chrome
+(close button, counter, caption, EXIF, full-resolution link) is an
+absolutely positioned overlay with a gradient scrim, not separate
+header/footer rows.
+**Why:** matches the reference layout the user pointed to (a
+commercial gallery script, X3 Photo Gallery / Imagevue - not cloned
+directly, but the underlying pattern is standard). Stacked header/
+image/footer rows each claim a fixed slice of vertical space and
+shrink the photo itself; overlaying the chrome on top of a full-bleed
+image gives the photo nearly the entire viewport regardless of
+orientation, which is what makes portrait and landscape both feel
+immersive without needing separate handling. Replaced the earlier
+click-to-zoom toggle with a plain "view full resolution" link that
+opens the large variant in a new tab - simpler, and this layout leaves
+less need for in-place zooming since the photo is already using all
+the space it can.

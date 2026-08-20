@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { Photo } from '../../features/photography/types'
 import { formatExif, formatCamera } from '../../features/photography/formatExif'
@@ -12,14 +12,17 @@ interface LightboxProps {
 }
 
 /**
- * Accessible modal lightbox. Default view fits the photo entirely on
- * screen (object-contain within the available space) - this works
- * identically for portrait and landscape, which is why there's no
- * orientation switching needed. Clicking the photo toggles to a
- * full-resolution zoomed view that scrolls, for inspecting detail on
- * the high-resolution originals - the standard pattern used by
- * Google Photos/Unsplash/Behance, rather than always forcing a
- * scrollbar (which undercuts the clean presentation of the fit view).
+ * Full-bleed modal lightbox. The photo fills the entire viewport
+ * (object-contain against 100% width/height) - this is what makes
+ * portrait and landscape both look immersive without any orientation
+ * switching: a portrait photo naturally uses full height, a landscape
+ * one naturally uses full width, edge to edge either way.
+ *
+ * All chrome (close button, counter, caption, EXIF) is an absolutely
+ * positioned overlay with a gradient scrim, not separate header/footer
+ * rows - rows would each claim a fixed slice of vertical space and
+ * shrink the image itself, which is what made the previous version
+ * feel cramped next to full-bleed references.
  *
  * Traps initial focus, closes on Escape, navigates with arrow keys,
  * restores focus to whatever triggered it on close. Rendered via a
@@ -28,18 +31,7 @@ interface LightboxProps {
 export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
-  const [isZoomed, setIsZoomed] = useState(false)
-  const [lastIndex, setLastIndex] = useState(activeIndex)
   const photo = photos[activeIndex]
-
-  // Reset zoom whenever the photo changes, so navigating never carries
-  // a scrolled/zoomed state over to the next image. Adjusting state
-  // during render (rather than in an effect) avoids an extra render
-  // pass - see https://react.dev/learn/you-might-not-need-an-effect
-  if (activeIndex !== lastIndex) {
-    setLastIndex(activeIndex)
-    setIsZoomed(false)
-  }
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement
@@ -75,65 +67,54 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
       role="dialog"
       aria-modal="true"
       aria-label={photo.title}
-      className="fixed inset-0 z-50 flex flex-col bg-[var(--color-canvas)]/98 backdrop-blur"
+      className="fixed inset-0 z-50 bg-black"
       onClick={onClose}
     >
-      <div className="flex items-center justify-between px-6 py-4 sm:px-10">
+      {/* The photo itself - full-bleed, edge to edge on whichever
+          dimension it's constrained by. */}
+      <img
+        src={photo.largeUrl}
+        alt={photo.caption || photo.title}
+        className="absolute inset-0 h-full w-full object-contain"
+      />
+
+      {/* Top scrim + controls */}
+      <div
+        className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-6 py-4 sm:px-10"
+        onClick={(e) => e.stopPropagation()}
+      >
         <DataLabel items={[`${activeIndex + 1} / ${photos.length}`]} />
         <button
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          className="data-label rounded-full border border-[var(--color-line)] px-4 py-2 hover:border-[var(--color-brass)] hover:text-[var(--color-brass)]"
+          className="data-label rounded-full border border-white/20 px-4 py-2 text-white hover:border-[var(--color-brass)] hover:text-[var(--color-brass)]"
         >
           Close (Esc)
         </button>
       </div>
 
-      {/*
-        min-h-0 is load-bearing here: without it, this flex-1 area's
-        default min-height would grow to fit the image's intrinsic
-        size instead of staying capped at the space actually available,
-        which is what let tall portrait photos blow past the viewport
-        with nothing to scroll. With it, the fit view has a real fixed
-        height to contain against, and the zoomed view has a real fixed
-        height to scroll within.
-      */}
+      {/* Bottom scrim + caption/EXIF */}
       <div
-        className={`flex min-h-0 flex-1 items-center justify-center px-4 pb-4 ${isZoomed ? 'overflow-auto' : 'overflow-hidden'}`}
+        className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-t from-black/70 to-transparent px-6 py-4 sm:px-10"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={() => setIsZoomed((z) => !z)}
-          aria-label={isZoomed ? 'Zoom out' : 'Zoom in to full resolution'}
-          className={isZoomed ? 'cursor-zoom-out m-auto' : 'cursor-zoom-in'}
-        >
-          <img
-            src={photo.largeUrl}
-            alt={photo.caption || photo.title}
-            className={isZoomed ? 'max-w-none' : 'max-h-full max-w-full object-contain'}
-          />
-        </button>
-      </div>
-
-      <div
-        className="flex flex-col gap-2 border-t border-[var(--color-line)] px-6 py-4 sm:px-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-[var(--color-ink)]">{photo.title}</p>
-            {photo.caption && <p className="text-sm text-[var(--color-ink-muted)]">{photo.caption}</p>}
+        <div>
+          <p className="text-white">{photo.title}</p>
+          {photo.caption && <p className="text-sm text-white/70">{photo.caption}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-4">
+            {exif.length > 0 && <DataLabel items={exif} />}
+            {camera && <p className="data-label text-white/60">{camera}</p>}
           </div>
-          <p className="data-label whitespace-nowrap text-[var(--color-ink-muted)]">
-            {isZoomed ? 'Click photo to fit screen' : 'Click photo to zoom'}
-          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          {exif.length > 0 && <DataLabel items={exif} />}
-          {camera && <p className="data-label text-[var(--color-ink-muted)]">{camera}</p>}
-        </div>
+        <a
+          href={photo.largeUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="data-label whitespace-nowrap text-white/70 hover:text-[var(--color-brass)]"
+        >
+          View full resolution ↗
+        </a>
       </div>
 
       {activeIndex > 0 && (
@@ -144,7 +125,7 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
             e.stopPropagation()
             onNavigate(activeIndex - 1)
           }}
-          className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[var(--color-ink)] hover:border-[var(--color-brass)] sm:block"
+          className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full border border-white/20 bg-black/40 px-4 py-3 text-white hover:border-[var(--color-brass)] sm:block"
         >
           ←
         </button>
@@ -157,7 +138,7 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
             e.stopPropagation()
             onNavigate(activeIndex + 1)
           }}
-          className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full border border-[var(--color-line)] bg-[var(--color-canvas)] px-4 py-3 text-[var(--color-ink)] hover:border-[var(--color-brass)] sm:block"
+          className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full border border-white/20 bg-black/40 px-4 py-3 text-white hover:border-[var(--color-brass)] sm:block"
         >
           →
         </button>
