@@ -72,14 +72,16 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
       </div>
 
       <div
-        className="flex flex-1 items-center justify-center px-4 pb-4"
+        className="min-h-0 flex-1 overflow-auto px-4 pb-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <img
-          src={photo.largeUrl}
-          alt={photo.caption || photo.title}
-          className="max-h-full max-w-full object-contain"
-        />
+        <div className="flex min-h-full items-center justify-center">
+          <img
+            src={photo.largeUrl}
+            alt={photo.caption || photo.title}
+            className="max-h-[calc(100vh-12rem)] max-w-full object-contain"
+          />
+        </div>
       </div>
 
       <div

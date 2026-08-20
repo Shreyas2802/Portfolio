@@ -171,3 +171,13 @@ arrow-key navigation, basic focus handling) instead of a UI library.
 **Why:** no new dependency for something this contained, and it needed
 to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
+
+**Fix:** portrait photos overflowed the lightbox viewport with no way
+to scroll. Cause: the image's flex container had no `min-height: 0`,
+so its default `min-height: auto` let it grow to the image's full
+intrinsic height instead of shrinking to the available space -
+`max-height: 100%` on the `<img>` can't help if the container itself
+never shrinks. Fixed with `min-h-0` on the container, an explicit
+`max-h-[calc(100vh-12rem)]` on the image (more reliable than a
+percentage-based max-height here), and `overflow-auto` on the
+container as a fallback for any edge case both of those miss.
