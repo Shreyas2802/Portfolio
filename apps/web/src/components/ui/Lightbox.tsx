@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Photo } from '../../features/photography/types'
 import { formatExif, formatCamera } from '../../features/photography/formatExif'
@@ -12,15 +12,34 @@ interface LightboxProps {
 }
 
 /**
- * Accessible modal lightbox: traps focus, closes on Escape, navigates
- * with arrow keys, restores focus to whatever triggered it on close.
- * Rendered via a portal so it always sits above the rest of the page
- * regardless of where it's mounted in the tree.
+ * Accessible modal lightbox. Default view fits the photo entirely on
+ * screen (object-contain within the available space) - this works
+ * identically for portrait and landscape, which is why there's no
+ * orientation switching needed. Clicking the photo toggles to a
+ * full-resolution zoomed view that scrolls, for inspecting detail on
+ * the high-resolution originals - the standard pattern used by
+ * Google Photos/Unsplash/Behance, rather than always forcing a
+ * scrollbar (which undercuts the clean presentation of the fit view).
+ *
+ * Traps initial focus, closes on Escape, navigates with arrow keys,
+ * restores focus to whatever triggered it on close. Rendered via a
+ * portal so it always sits above the rest of the page.
  */
 export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
+  const [isZoomed, setIsZoomed] = useState(false)
+  const [lastIndex, setLastIndex] = useState(activeIndex)
   const photo = photos[activeIndex]
+
+  // Reset zoom whenever the photo changes, so navigating never carries
+  // a scrolled/zoomed state over to the next image. Adjusting state
+  // during render (rather than in an effect) avoids an extra render
+  // pass - see https://react.dev/learn/you-might-not-need-an-effect
+  if (activeIndex !== lastIndex) {
+    setLastIndex(activeIndex)
+    setIsZoomed(false)
+  }
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement as HTMLElement
@@ -71,23 +90,46 @@ export function Lightbox({ photos, activeIndex, onClose, onNavigate }: LightboxP
         </button>
       </div>
 
+      {/*
+        min-h-0 is load-bearing here: without it, this flex-1 area's
+        default min-height would grow to fit the image's intrinsic
+        size instead of staying capped at the space actually available,
+        which is what let tall portrait photos blow past the viewport
+        with nothing to scroll. With it, the fit view has a real fixed
+        height to contain against, and the zoomed view has a real fixed
+        height to scroll within.
+      */}
       <div
-        className="flex flex-1 justify-center overflow-auto px-4 pb-4"
+        className={`flex min-h-0 flex-1 items-center justify-center px-4 pb-4 ${isZoomed ? 'overflow-auto' : 'overflow-hidden'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <img
-          src={photo.largeUrl}
-          alt={photo.caption || photo.title}
-          className="m-auto max-w-full object-contain"
-        />
+        <button
+          type="button"
+          onClick={() => setIsZoomed((z) => !z)}
+          aria-label={isZoomed ? 'Zoom out' : 'Zoom in to full resolution'}
+          className={isZoomed ? 'cursor-zoom-out m-auto' : 'cursor-zoom-in'}
+        >
+          <img
+            src={photo.largeUrl}
+            alt={photo.caption || photo.title}
+            className={isZoomed ? 'max-w-none' : 'max-h-full max-w-full object-contain'}
+          />
+        </button>
       </div>
 
       <div
         className="flex flex-col gap-2 border-t border-[var(--color-line)] px-6 py-4 sm:px-10"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-[var(--color-ink)]">{photo.title}</p>
-        {photo.caption && <p className="text-sm text-[var(--color-ink-muted)]">{photo.caption}</p>}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[var(--color-ink)]">{photo.title}</p>
+            {photo.caption && <p className="text-sm text-[var(--color-ink-muted)]">{photo.caption}</p>}
+          </div>
+          <p className="data-label whitespace-nowrap text-[var(--color-ink-muted)]">
+            {isZoomed ? 'Click photo to fit screen' : 'Click photo to zoom'}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-4">
           {exif.length > 0 && <DataLabel items={exif} />}
           {camera && <p className="data-label text-[var(--color-ink-muted)]">{camera}</p>}

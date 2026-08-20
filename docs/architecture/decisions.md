@@ -172,15 +172,17 @@ arrow-key navigation, basic focus handling) instead of a UI library.
 to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
 
-**Decision:** Photos open at their natural rendered size in the
-lightbox (no shrink-to-fit), with the container scrolling for
-anything taller or wider than the viewport - rather than constraining
-every photo to fit on screen.
-**Why:** preference - seeing the photo at full size with a scrollbar
-was the wanted behavior over always-fit. Implemented with `margin:
-auto` on the image (not `align-items: center` on the flex container) -
-that combination centers the image the same way when it fits, but
-avoids a real flexbox bug where `overflow: auto` + `align-items:
-center` makes the top of an oversized centered item unreachable by
-scrolling. `margin: auto` degrades to normal top-aligned scroll
-instead.
+**Decision:** Lightbox defaults to fit-to-screen (`object-contain`
+within the available space) for every photo regardless of
+orientation, with a click-to-zoom toggle that switches to a scrollable
+full-resolution view.
+**Why:** this is the standard pattern real photo sites use (Google
+Photos, Unsplash, Behance) - fit view keeps the presentation clean for
+browsing, and zoom lets high-resolution work actually be inspected in
+detail on request. It also makes a portrait/landscape tab switch
+unnecessary: fit-to-screen already treats both orientations
+identically, so there's nothing for tabs to solve. Reaching this took
+a few iterations - see the `min-h-0` explanation in the component
+itself for the underlying flexbox issue that motivated always keeping
+the image area's height properly capped, in both the fit and zoomed
+states.
