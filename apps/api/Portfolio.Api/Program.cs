@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Portfolio.Application.Contact;
+using Portfolio.Infrastructure.Contact;
 using Portfolio.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,8 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddDbContext<PortfolioDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IContactMessageService, ContactMessageService>();
 
 // Structured error handling: unhandled exceptions become a standard
 // RFC 7807 ProblemDetails JSON response instead of leaking a stack

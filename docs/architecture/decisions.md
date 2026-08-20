@@ -95,3 +95,34 @@ Phase 7 (Hardening).
 **Why:** it's a few lines and costs nothing to have on from the start;
 retrofitting error handling after controllers exist is more error-prone
 than starting with it.
+
+---
+
+## Phase 3 — Public portfolio content
+**Decision:** Contact form is wired to a real `POST /api/contact`
+endpoint backed by a `ContactMessage` table, not a fake form or a
+`mailto:` link.
+**Why:** the EF Core/migrations pipeline from Phase 2 was already
+proven working - a static form would be a step backward, and a real
+persisted contact message is exactly the kind of full-stack proof
+point this site exists to demonstrate.
+
+**Decision:** A honeypot field (`Website`, hidden via CSS + `aria-hidden`
++ `tabIndex={-1}`) rather than a CAPTCHA or third-party spam service.
+**Why:** cheap, no dependency, no user friction, and catches the bulk
+of naive bots. Real rate limiting is still tracked for Phase 7
+(Hardening) - this is a first line of defense, not the final one.
+
+**Decision:** Project case studies (Brahmanda Tatva, this Portfolio
+Platform) are hand-written static data (`src/data/projects.ts`), not
+API-backed.
+**Why:** two case studies that change rarely don't justify a
+`Project` DB table + admin CRUD yet. If/when the admin CMS (Phase 6)
+needs to edit these without a redeploy, this is the natural place to
+convert to an API call - the page components don't need to change.
+
+**Decision:** Resume served as a static PDF from `public/documents/`
+rather than a database-backed download.
+**Why:** it's one file that changes infrequently; a static asset is
+simpler than adding upload/versioning machinery for something this
+low-frequency.

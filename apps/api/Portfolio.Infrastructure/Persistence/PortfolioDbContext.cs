@@ -18,6 +18,7 @@ public class PortfolioDbContext : DbContext
     }
 
     public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
+    public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,13 @@ public class PortfolioDbContext : DbContext
         {
             entity.Property(e => e.SiteTitle).HasMaxLength(200).IsRequired();
             entity.Property(e => e.SiteDescription).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<ContactMessage>(entity =>
+        {
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(320).IsRequired();
+            entity.Property(e => e.Message).HasMaxLength(4000).IsRequired();
         });
     }
 }

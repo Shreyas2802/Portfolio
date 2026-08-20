@@ -45,6 +45,9 @@ To add a new migration after changing entities:
 ```bash
 dotnet ef migrations add <DescriptiveName> --project Portfolio.Infrastructure --startup-project Portfolio.Api
 ```
+Phase 3 adds a `ContactMessage` entity — after pulling these changes,
+add and apply a new migration for it (see "Add a new migration" above,
+then `database update` again) before the contact form will work.
 
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
