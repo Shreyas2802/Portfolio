@@ -157,6 +157,34 @@ public class PhotoUploadService : IPhotoUploadService
         }
     }
 
+    public async Task<bool> DeleteAsync(int photoId, CancellationToken cancellationToken)
+    {
+        var photo = await _dbContext.Photos.FindAsync([photoId], cancellationToken);
+        if (photo is null)
+        {
+            return false;
+        }
+
+        foreach (var path in new[] { photo.ThumbnailPath, photo.MediumPath, photo.LargePath })
+        {
+            try
+            {
+                await _storageService.DeleteVariantAsync(path, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Log and continue - a missing/already-deleted file
+                // shouldn't block removing the database row, which is
+                // the part the admin actually cares about here.
+                _logger.LogWarning(ex, "Failed to delete variant {Path} for photo {PhotoId}", path, photoId);
+            }
+        }
+
+        _dbContext.Photos.Remove(photo);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private static byte[] ResizeAndEncode(SKBitmap original, int maxWidth)
     {
         SKBitmap toEncode = original;

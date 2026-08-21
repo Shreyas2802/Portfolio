@@ -286,6 +286,43 @@ Photo/Album/Category/Tag/Project management (the admin UI itself)
 follow in the next part of Phase 6 - there is still no way to log in
 or manage content through the browser yet, only via direct API calls.
 
+---
+
+## Phase 6b — Admin UI (login, dashboard, photo management)
+**Decision:** JWT stored in `localStorage` (via a small `AuthContext`
++ `authStorage.ts`), attached as `Authorization: Bearer <token>` on
+every authenticated request - not an HttpOnly cookie.
+**Why:** simplest option that works cleanly with a SPA making direct
+fetch calls, and matches the JWT-bearer choice already made on the
+backend. The tradeoff (XSS could theoretically read `localStorage`)
+is accepted here because there is exactly one admin user securing
+their own personal site's content, not a multi-user app handling
+other people's sensitive data - a cookie-based approach would be the
+right call at a different risk profile.
+
+**Decision:** `ProtectedRoute` (client-side redirect to `/admin/login`
+if not authenticated) is explicitly documented as a UX convenience,
+not the real security boundary - that's the server's
+`[Authorize(Roles = "Admin")]`.
+**Why:** a client-side check can always be bypassed by editing
+`localStorage`; the point of stating this plainly in the code is so a
+future change never mistakes the frontend guard for actual protection
+and skips adding the matching backend check.
+
+**Decision:** Added `GET /api/photography/photos` (admin-only, returns
+every photo including unpublished ones) rather than reusing the public
+`featured`/`albums/{slug}` endpoints for the admin photo list.
+**Why:** the public endpoints intentionally only return published
+photos and are scoped to one album at a time - the admin list needs
+everything, across all albums, regardless of publish state.
+
+**Decision:** Deleting a photo removes the database row and best-
+effort deletes its three variant files, logging (not failing) if a
+file is already missing.
+**Why:** a missing file on disk shouldn't block removing the database
+record, which is the part that actually matters to the admin - an
+already-gone file isn't a real error worth surfacing.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely

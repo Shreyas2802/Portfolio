@@ -69,6 +69,15 @@ public class PhotographyQueryService : IPhotographyQueryService
         return photos.Select(ToDto).ToList();
     }
 
+    public async Task<List<PhotoDto>> GetAllPhotosAsync(CancellationToken cancellationToken)
+    {
+        var photos = await _dbContext.Photos
+            .OrderByDescending(p => p.UploadedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return photos.Select(ToDto).ToList();
+    }
+
     private static PhotoDto ToDto(Photo p) => new()
     {
         Id = p.Id,

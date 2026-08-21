@@ -6,6 +6,12 @@ import { ProjectsPage } from './routes/ProjectsPage'
 import { ProjectDetailPage } from './routes/ProjectDetailPage'
 import { AboutPage } from './routes/AboutPage'
 import { ContactPage } from './routes/ContactPage'
+import { LoginPage } from './routes/admin/LoginPage'
+import { DashboardPage } from './routes/admin/DashboardPage'
+import { PhotosAdminPage } from './routes/admin/PhotosAdminPage'
+import { ProtectedRoute } from './components/admin/ProtectedRoute'
+import { AdminLayout } from './components/admin/AdminLayout'
+import { AuthProvider } from './features/auth/AuthContext'
 
 const router = createBrowserRouter([
   {
@@ -20,10 +26,28 @@ const router = createBrowserRouter([
       { path: 'contact', element: <ContactPage /> },
     ],
   },
+  { path: '/admin/login', element: <LoginPage /> },
+  {
+    path: '/admin',
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'photos', element: <PhotosAdminPage /> },
+        ],
+      },
+    ],
+  },
 ])
 
 function App() {
-  return <RouterProvider router={router} />
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  )
 }
 
 export default App

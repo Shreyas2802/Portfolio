@@ -96,6 +96,15 @@ endpoint instead of the old `X-Admin-Key` header.
 There is still no admin *UI* yet — login and CRUD screens are the
 next part of Phase 6. Test via Postman/curl for now.
 
+Phase 6b adds the admin UI itself (no new migration needed): visit
+`/admin/login` in the browser, sign in with the `AdminUser` credentials
+you set above, and you'll land on a dashboard with photo/album/project/
+unread-message counts. `/admin/photos` has a real upload form (file,
+title, caption, album picker) and a grid of every photo with a delete
+button on hover. This finally replaces Postman for day-to-day use —
+Postman/curl are still useful for testing the API directly, but aren't
+required anymore.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

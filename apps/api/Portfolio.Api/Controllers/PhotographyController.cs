@@ -51,6 +51,14 @@ public class PhotographyController : ControllerBase
         return Ok(photos);
     }
 
+    [HttpGet("photos")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAllPhotos(CancellationToken cancellationToken)
+    {
+        var photos = await _photographyQueryService.GetAllPhotosAsync(cancellationToken);
+        return Ok(photos);
+    }
+
     [HttpPost("upload")]
     [Authorize(Roles = "Admin")]
     [RequestSizeLimit(30 * 1024 * 1024)]
@@ -83,5 +91,17 @@ public class PhotographyController : ControllerBase
         }
 
         return Ok(result.Photo);
+    }
+
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
+    {
+        var deleted = await _photoUploadService.DeleteAsync(id, cancellationToken);
+        if (!deleted)
+        {
+            return NotFound();
+        }
+        return NoContent();
     }
 }

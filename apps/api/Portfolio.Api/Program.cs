@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Portfolio.Application.Admin;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Contact;
 using Portfolio.Application.Photography;
+using Portfolio.Infrastructure.Admin;
 using Portfolio.Infrastructure.Contact;
 using Portfolio.Infrastructure.Identity;
 using Portfolio.Infrastructure.Persistence;
@@ -61,6 +63,7 @@ builder.Services.AddScoped<IPhotographyQueryService, PhotographyQueryService>();
 builder.Services.AddScoped<IPhotoStorageService, LocalPhotoStorageService>();
 builder.Services.AddScoped<IPhotoUploadService, PhotoUploadService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 
 // Structured error handling: unhandled exceptions become a standard
 // RFC 7807 ProblemDetails JSON response instead of leaking a stack
