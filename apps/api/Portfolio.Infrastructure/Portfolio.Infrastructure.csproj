@@ -14,13 +14,21 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
+    <PackageReference Include="MetadataExtractor" Version="2.8.1" />
   </ItemGroup>
 
   <!--
-    ASP.NET Core Identity, SkiaSharp, MetadataExtractor, and filesystem
-    storage code arrive in later phases (Identity in Phase 6, image
-    processing in Phase 5). EF Core + SQL Server land now (Phase 2) so
-    the migrations pipeline exists before any real domain model does.
+    ASP.NET Core Identity arrives in Phase 6. SkiaSharp (MIT) handles
+    decode/resize/encode and MetadataExtractor (Apache 2.0) handles
+    EXIF reading, per spec section on image libraries - ImageSharp is
+    explicitly excluded there since recent versions require a
+    commercial license above a revenue threshold; these two stay fully
+    free regardless of the site's future usage. The Linux native
+    asset package is included alongside the default one so this keeps
+    working if the API ever runs on a Linux host (Phase 10 mentions
+    Plesk, which is often Linux).
   -->
 
 </Project>

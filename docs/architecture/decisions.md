@@ -172,6 +172,56 @@ arrow-key navigation, basic focus handling) instead of a UI library.
 to match the site's specific visual language (DataLabel EXIF footer)
 that a generic library wouldn't provide out of the box.
 
+---
+
+## Phase 5 — Image Processing (upload endpoint, validation, EXIF, variants)
+**Decision:** SkiaSharp (MIT) for decode/resize/encode, MetadataExtractor
+(Apache 2.0) for EXIF reading - not ImageSharp.
+**Why:** the spec explicitly calls this out - ImageSharp's recent
+versions require a commercial license above a revenue threshold, and
+the spec says not to make it a mandatory dependency. SkiaSharp and
+MetadataExtractor both stay genuinely free regardless of the site's
+future use, matching the "free/open-source stack only" constraint
+with no ambiguity.
+
+**Decision:** File validity is checked by actually decoding the bytes
+with SkiaSharp, never by trusting the declared content-type or file
+extension.
+**Why:** a client can label any file "image/jpeg" - the only real
+check is whether it decodes as one. This also means corrupt or
+truncated uploads are rejected with a clear error instead of being
+silently stored as broken images.
+
+**Decision:** The upload endpoint is gated by a temporary shared-secret
+header (`X-Admin-Key`), checked against an `AdminUploadKey` value in
+.NET User Secrets (never committed) - not `[Authorize]`, since Identity
+doesn't exist until Phase 6.
+**Why:** Phase 5 explicitly comes before Phase 6 in the spec's own
+plan, which means real auth genuinely isn't available yet - but
+leaving a file-upload endpoint completely open in that gap is a real
+risk, not just an incompleteness. The check fails closed: if the key
+isn't configured at all, no request can ever match, so upload is
+unreachable by default rather than silently open. This is explicitly
+temporary - replace with `[Authorize(Roles = "Admin")]` and delete the
+`AdminUploadKey` configuration entirely once Phase 6 lands.
+
+**Decision:** On any failure after variant files have been written
+(e.g. the database save fails), all already-saved variants for that
+upload are deleted before returning an error.
+**Why:** spec Phase 5 explicitly calls for cleanup/error handling - a
+failed upload should never leave orphaned files with no corresponding
+database row. Cleanup failures are logged but don't mask the original
+error returned to the caller.
+
+**Decision:** `IPhotoStorageService` abstracts "save a variant, get a
+URL back" / "delete a variant" - `LocalPhotoStorageService` is the
+only implementation today (writes to `wwwroot/uploads`), with path
+traversal explicitly blocked by resolving and verifying the final path
+stays inside the uploads root.
+**Why:** matches the spec's "storage abstraction" requirement -
+swapping to cloud storage later means writing one new class, not
+touching the upload service, the controller, or any calling code.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely

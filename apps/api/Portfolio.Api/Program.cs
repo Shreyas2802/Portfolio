@@ -17,6 +17,8 @@ builder.Services.AddDbContext<PortfolioDbContext>(options =>
 
 builder.Services.AddScoped<IContactMessageService, ContactMessageService>();
 builder.Services.AddScoped<IPhotographyQueryService, PhotographyQueryService>();
+builder.Services.AddScoped<IPhotoStorageService, LocalPhotoStorageService>();
+builder.Services.AddScoped<IPhotoUploadService, PhotoUploadService>();
 
 // Structured error handling: unhandled exceptions become a standard
 // RFC 7807 ProblemDetails JSON response instead of leaking a stack

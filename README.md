@@ -55,6 +55,23 @@ On first run in Development, the API automatically seeds the gallery
 with real photos (see `wwwroot/uploads/photos/` and `DbSeeder.cs`) —
 no manual data entry needed to see the gallery working.
 
+Phase 5 adds the real upload pipeline (no entity changes, no new
+migration needed). Before it will work, set a temporary admin key —
+this gates the upload endpoint until real Identity/auth lands in
+Phase 6:
+```bash
+cd apps/api/Portfolio.Api
+dotnet user-secrets set "AdminUploadKey" "<pick-any-string>"
+```
+This is stored outside the repo (never committed) via .NET's User
+Secrets, already wired up via the `UserSecretsId` in
+`Portfolio.Api.csproj`. To test the upload endpoint, send a
+`multipart/form-data` POST to `/api/photography/upload` with fields
+`file`, `title`, `caption` (optional), `albumId`, and header
+`X-Admin-Key: <the value you set>` — Postman or curl both work fine.
+Without the header (or with the wrong value), the endpoint returns
+401 — there is no "upload UI" yet; that's Phase 6's admin dashboard.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and
