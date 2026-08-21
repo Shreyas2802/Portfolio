@@ -1,18 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Portfolio.Application.Photography;
 
 namespace Portfolio.Api.Controllers;
 
 /// <summary>
-/// Public, read-only photography endpoints, plus one write endpoint
-/// (upload) added in Phase 5. Real authentication/authorization
-/// (Identity, Login, [Authorize] with roles) arrives in Phase 6 - until
-/// then, upload is gated by a temporary shared-secret header
-/// (X-Admin-Key) checked against configuration, so this doesn't sit
-/// open with no protection at all in the gap between phases. This gate
-/// is explicitly temporary: replace it with [Authorize(Roles = "Admin")]
-/// once Identity lands, and remove the AdminUploadKey configuration
-/// entirely at that point.
+/// Public, read-only photography endpoints, plus the upload endpoint.
+/// Upload is now protected by real Identity-based authorization
+/// (Phase 6) - this replaces the temporary X-Admin-Key header check
+/// from Phase 5, which existed only because Identity didn't exist yet.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -20,16 +16,13 @@ public class PhotographyController : ControllerBase
 {
     private readonly IPhotographyQueryService _photographyQueryService;
     private readonly IPhotoUploadService _photoUploadService;
-    private readonly IConfiguration _configuration;
 
     public PhotographyController(
         IPhotographyQueryService photographyQueryService,
-        IPhotoUploadService photoUploadService,
-        IConfiguration configuration)
+        IPhotoUploadService photoUploadService)
     {
         _photographyQueryService = photographyQueryService;
         _photoUploadService = photoUploadService;
-        _configuration = configuration;
     }
 
     [HttpGet("albums")]
@@ -59,6 +52,7 @@ public class PhotographyController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [Authorize(Roles = "Admin")]
     [RequestSizeLimit(30 * 1024 * 1024)]
     public async Task<IActionResult> Upload(
         [FromForm] IFormFile file,
@@ -67,17 +61,6 @@ public class PhotographyController : ControllerBase
         [FromForm] int albumId,
         CancellationToken cancellationToken)
     {
-        var configuredKey = _configuration["AdminUploadKey"];
-        var providedKey = Request.Headers["X-Admin-Key"].ToString();
-        // Fail closed: if AdminUploadKey isn't configured at all, no
-        // key can ever match, so upload is unreachable rather than
-        // silently open - a missing config value should never mean
-        // "no check happens".
-        if (string.IsNullOrEmpty(configuredKey) || providedKey != configuredKey)
-        {
-            return Unauthorized(new { error = "Missing or invalid X-Admin-Key header." });
-        }
-
         if (file is null || file.Length == 0)
         {
             return BadRequest(new { error = "No file was uploaded." });

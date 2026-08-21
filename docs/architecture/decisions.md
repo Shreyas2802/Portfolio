@@ -232,6 +232,60 @@ plain library needs them as explicit NuGet packages. Fixed by adding
 `Microsoft.Extensions.Logging.Abstractions` package references
 directly to `Portfolio.Infrastructure.csproj`.
 
+---
+
+## Phase 6a — Admin auth foundation (Identity, Login, Authorization)
+**Decision:** `ApplicationUser : IdentityUser` lives in
+`Portfolio.Infrastructure/Identity/`, not `Portfolio.Domain` -
+breaking the "every entity lives in Domain" pattern used everywhere
+else in this codebase.
+**Why:** `IdentityUser` is inherently framework-coupled (password
+hashing, EF mapping, lockout state) - putting it in Domain, which is
+kept deliberately dependency-free, would mean either compromising that
+boundary or wrapping Identity in an adapter for no real benefit on a
+single-owner site. The honest inconsistency (documented here) beats
+a technically-pure but pointless abstraction layer.
+
+**Decision:** JWT bearer tokens, not cookie-based auth.
+**Why:** matches JWT experience already on the site owner's resume
+(AuthServer project, Brahmanda Tatva), and keeps the API stateless -
+no server-side session store, consistent with this being a pure JSON
+API behind a separate SPA rather than a server-rendered app. Used
+`AddIdentityCore` (not `AddIdentity`) specifically because it skips
+the cookie/UI scheme setup that a pure API doesn't need.
+
+**Decision:** No public registration endpoint. The single admin
+account is created from `AdminUser:Username`/`AdminUser:Password`
+configuration (User Secrets, never committed) via `IdentitySeeder`,
+which runs on every startup but only acts once - idempotent, and a
+no-op entirely if those secrets aren't set.
+**Why:** this is a single-owner personal site, not multi-tenant SaaS -
+a registration flow would be attack surface for a problem that doesn't
+exist here. `Role` still exists properly (an "Admin" `IdentityRole` is
+seeded too) so `[Authorize(Roles = "Admin")]` is real role-based
+authorization, not just "any logged-in user."
+
+**Decision:** `PhotographyController.Upload` now uses
+`[Authorize(Roles = "Admin")]`, replacing the temporary `X-Admin-Key`
+header check from Phase 5 entirely - the `AdminUploadKey`
+configuration value is no longer read anywhere.
+**Why:** this was always the planned replacement, flagged explicitly
+in the Phase 5 entry above. Real role-based authorization is strictly
+stronger than a shared-secret header, and removing the old check
+avoids leaving two competing gates on the same endpoint.
+
+**Decision:** Login always returns the same generic "Invalid username
+or password" message, whether the username doesn't exist or the
+password is wrong.
+**Why:** returning a different message for "no such user" vs "wrong
+password" lets an attacker enumerate valid usernames one guess at a
+time - a well-known and easily avoided information leak.
+
+**Note:** this covers Identity/Login/Authorization only. Dashboard,
+Photo/Album/Category/Tag/Project management (the admin UI itself)
+follow in the next part of Phase 6 - there is still no way to log in
+or manage content through the browser yet, only via direct API calls.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely

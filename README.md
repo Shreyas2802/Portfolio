@@ -72,6 +72,30 @@ Secrets, already wired up via the `UserSecretsId` in
 Without the header (or with the wrong value), the endpoint returns
 401 — there is no "upload UI" yet; that's Phase 6's admin dashboard.
 
+Phase 6 (auth foundation) replaces `AdminUploadKey` with real Identity
+and JWT auth — the upload endpoint no longer checks `X-Admin-Key` at
+all. New entities (ASP.NET Core Identity's own tables) need a
+migration, and three secrets need to be set before login works:
+```bash
+cd apps/api/Portfolio.Api
+dotnet user-secrets set "Jwt:Key" "<a long random string, 32+ chars>"
+dotnet user-secrets set "AdminUser:Username" "<pick a username>"
+dotnet user-secrets set "AdminUser:Password" "<pick a password, 12+ chars>"
+```
+Then from `apps/api`:
+```bash
+dotnet ef migrations add AddIdentity --project Portfolio.Infrastructure --startup-project Portfolio.Api
+dotnet ef database update --project Portfolio.Infrastructure --startup-project Portfolio.Api
+```
+On next run, the admin user is created automatically from those
+secrets. To log in, `POST /api/auth/login` with JSON body
+`{ "username": "...", "password": "..." }` — the response includes a
+`token`. Pass it as `Authorization: Bearer <token>` on the upload
+endpoint instead of the old `X-Admin-Key` header.
+
+There is still no admin *UI* yet — login and CRUD screens are the
+next part of Phase 6. Test via Postman/curl for now.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

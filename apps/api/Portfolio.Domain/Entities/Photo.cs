@@ -41,4 +41,6 @@ public class Photo
     public int DisplayOrder { get; set; }
     public bool IsPublished { get; set; }
     public DateTime UploadedAtUtc { get; set; }
+
+    public ICollection<Tag> Tags { get; set; } = new List<Tag>();
 }

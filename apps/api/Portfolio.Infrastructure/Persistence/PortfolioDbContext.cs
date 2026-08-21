@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Portfolio.Domain.Entities;
+using Portfolio.Infrastructure.Identity;
 
 namespace Portfolio.Infrastructure.Persistence;
 
@@ -9,8 +11,13 @@ namespace Portfolio.Infrastructure.Persistence;
 /// (spec section 6). Entities never cross the API boundary directly -
 /// DTOs handle that (spec principle #9) - so this stays purely an
 /// Infrastructure concern.
+///
+/// Inherits IdentityDbContext&lt;ApplicationUser&gt; as of Phase 6 -
+/// this adds ASP.NET Core Identity's own tables (AspNetUsers,
+/// AspNetRoles, etc.) alongside everything already here. A new
+/// migration is needed to create them; existing tables are untouched.
 /// </summary>
-public class PortfolioDbContext : DbContext
+public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
 {
     public PortfolioDbContext(DbContextOptions<PortfolioDbContext> options)
         : base(options)
@@ -22,6 +29,8 @@ public class PortfolioDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Album> Albums => Set<Album>();
     public DbSet<Photo> Photos => Set<Photo>();
+    public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<Project> Projects => Set<Project>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,6 +86,29 @@ public class PortfolioDbContext : DbContext
                 .WithMany(a => a.Photos)
                 .HasForeignKey(e => e.AlbumId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(e => e.Tags)
+                .WithMany(t => t.Photos)
+                .UsingEntity(j => j.ToTable("PhotoTags"));
+        });
+
+        modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Slug).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.Slug).IsUnique();
+        });
+
+        modelBuilder.Entity<Project>(entity =>
+        {
+            entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.ShortDescription).HasMaxLength(500);
+            entity.Property(e => e.Description).HasMaxLength(4000);
+            entity.Property(e => e.Technologies).HasMaxLength(500);
+            entity.Property(e => e.GithubUrl).HasMaxLength(500);
+            entity.Property(e => e.LiveUrl).HasMaxLength(500);
+            entity.Property(e => e.CoverImageUrl).HasMaxLength(500);
+            entity.HasIndex(e => e.Slug).IsUnique();
         });
     }
 }
