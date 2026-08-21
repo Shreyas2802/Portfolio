@@ -222,6 +222,16 @@ stays inside the uploads root.
 swapping to cloud storage later means writing one new class, not
 touching the upload service, the controller, or any calling code.
 
+**Fix:** build failed with `CS0234`/`CS0246` on `IHostEnvironment` in
+`Portfolio.Infrastructure`. Cause: that project is a plain class
+library (`Microsoft.NET.Sdk`), not a web project - `IHostEnvironment`,
+and typically `ILogger<T>`, are part of the ASP.NET Core shared
+framework that `Portfolio.Api` gets for free via `Sdk.Web`, but a
+plain library needs them as explicit NuGet packages. Fixed by adding
+`Microsoft.Extensions.Hosting.Abstractions` and
+`Microsoft.Extensions.Logging.Abstractions` package references
+directly to `Portfolio.Infrastructure.csproj`.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely
