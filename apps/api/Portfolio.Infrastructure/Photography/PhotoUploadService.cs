@@ -68,7 +68,9 @@ public class PhotoUploadService : IPhotoUploadService
         var decoded = SKBitmap.Decode(bytes);
         if (decoded is null)
         {
-            return Fail("File is not a valid, decodable image.");
+            return Fail(
+                "Couldn't read this file as an image. Supported formats: JPEG, PNG, WEBP. " +
+                "HEIC (common on iPhone) and RAW formats aren't supported - convert to JPEG first.");
         }
 
         try

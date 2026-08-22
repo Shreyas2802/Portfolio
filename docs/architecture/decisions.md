@@ -437,3 +437,20 @@ covers `element.requestFullscreen()` calls) - detected instead by
 comparing `window.innerWidth/innerHeight` to `window.screen.width/
 height` on resize, the standard technique since F11 hides browser
 chrome without involving the Fullscreen API at all.
+
+**Decision:** No HEIC or RAW support added. Upload only accepts
+whatever SkiaSharp decodes natively (JPEG, PNG, WEBP) - unsupported
+formats are rejected with a clear error naming the supported formats
+and suggesting conversion first.
+**Why:** real HEIC support (`LibHeifSharp`) needs the native `libheif`
+library actually installed on whatever machine runs the app - unlike
+every other dependency in this project, that's not a self-contained
+NuGet package, and would mean real setup friction on this dev machine
+now and on a production host later. RAW support needs an even heavier
+library (LibRaw) for a format that professional workflows always
+convert to JPEG before publishing anyway - there's no real case for
+serving RAW files directly on a website. Converting HEIC to JPEG
+before upload (or setting the iPhone's capture format to "Most
+Compatible" in Settings > Camera > Formats) is the standard, low-
+friction answer most sites take instead of building a custom decode
+pipeline for it.
