@@ -65,13 +65,41 @@ public class PhotoUploadService : IPhotoUploadService
         // Never trust the declared content-type - decode the actual
         // bytes. If SkiaSharp can't decode it, it isn't a real image,
         // regardless of what extension or content-type it arrived with.
-        using var original = SKBitmap.Decode(bytes);
-        if (original is null)
+        var decoded = SKBitmap.Decode(bytes);
+        if (decoded is null)
         {
             return Fail("File is not a valid, decodable image.");
         }
 
-        var exif = ExtractExif(bytes);
+        try
+        {
+            var exif = ExtractExif(bytes);
+
+            // Apply the EXIF-declared rotation/flip to the actual pixels
+            // now, once, rather than per-variant - see ApplyExifOrientation
+            // for why this is necessary at all.
+            var oriented = ApplyExifOrientation(decoded, exif.Orientation);
+            try
+            {
+                return await SaveUploadAsync(request, album, oriented, exif, cancellationToken);
+            }
+            finally
+            {
+                if (!ReferenceEquals(oriented, decoded))
+                {
+                    oriented.Dispose();
+                }
+            }
+        }
+        finally
+        {
+            decoded.Dispose();
+        }
+    }
+
+    private async Task<UploadPhotoResult> SaveUploadAsync(
+        UploadPhotoRequest request, Album album, SKBitmap original, ExifData exif, CancellationToken cancellationToken)
+    {
         var slug = await GenerateUniqueSlugAsync(request.Title, cancellationToken);
         var savedPaths = new List<string>();
 
@@ -237,13 +265,14 @@ public class PhotoUploadService : IPhotoUploadService
 
     private record ExifData(
         DateTime? TakenAt, string? CameraMake, string? CameraModel, string? LensModel,
-        decimal? Aperture, string? ShutterSpeed, int? Iso, decimal? FocalLengthMm);
+        decimal? Aperture, string? ShutterSpeed, int? Iso, decimal? FocalLengthMm, int Orientation);
 
     /// <summary>
     /// Reads real EXIF from the original file bytes via MetadataExtractor.
     /// Returns an all-null result rather than throwing if a photo has no
     /// EXIF (e.g. a screenshot, or a scan) - camera fields are nullable
-    /// on Photo for exactly this reason.
+    /// on Photo for exactly this reason. Orientation defaults to 1
+    /// (normal) when absent or unparseable.
     /// </summary>
     private static ExifData ExtractExif(byte[] bytes)
     {
@@ -258,6 +287,12 @@ public class PhotoUploadService : IPhotoUploadService
             string? make = ifd0?.GetDescription(ExifDirectoryBase.TagMake);
             string? model = ifd0?.GetDescription(ExifDirectoryBase.TagModel);
             string? lens = subIfd?.GetDescription(ExifDirectoryBase.TagLensModel);
+
+            int orientation = 1;
+            if (ifd0?.TryGetInt32(ExifDirectoryBase.TagOrientation, out var orientationValue) == true)
+            {
+                orientation = orientationValue;
+            }
 
             decimal? aperture = null;
             if (subIfd?.TryGetDouble(ExifDirectoryBase.TagFNumber, out var fNumber) == true)
@@ -292,13 +327,79 @@ public class PhotoUploadService : IPhotoUploadService
                 takenAt = dateTime;
             }
 
-            return new ExifData(takenAt, make, model, lens, aperture, shutter, iso, focalLength);
+            return new ExifData(takenAt, make, model, lens, aperture, shutter, iso, focalLength, orientation);
         }
         catch
         {
             // No EXIF, or unparseable - a photo without camera data is
             // still a valid upload, it just won't show a DataLabel.
-            return new ExifData(null, null, null, null, null, null, null, null);
+            return new ExifData(null, null, null, null, null, null, null, null, 1);
         }
+    }
+
+    /// <summary>
+    /// Cameras commonly store sensor pixel data in a fixed landscape
+    /// orientation and rely on the EXIF Orientation tag to tell viewers
+    /// how to rotate/flip it for display - SkiaSharp's decode does NOT
+    /// apply this automatically, it just hands back the raw pixels. Left
+    /// unhandled, a portrait photo shot on a camera that stores raw
+    /// landscape data (e.g. this site's Sony A6000) gets saved and
+    /// displayed sideways. This physically rotates/flips the pixels so
+    /// the saved variants need no orientation tag at all - consistent
+    /// with already stripping EXIF from served files (see Phase 4).
+    /// </summary>
+    private static SKBitmap ApplyExifOrientation(SKBitmap bitmap, int orientation) => orientation switch
+    {
+        2 => FlipHorizontal(bitmap),
+        3 => Rotate(bitmap, 180),
+        4 => FlipVertical(bitmap),
+        5 => Rotate(FlipHorizontal(bitmap), 270),
+        6 => Rotate(bitmap, 90),
+        7 => Rotate(FlipHorizontal(bitmap), 90),
+        8 => Rotate(bitmap, 270),
+        _ => bitmap, // 1, or missing/unrecognized - already correct
+    };
+
+    private static SKBitmap Rotate(SKBitmap bitmap, int degrees)
+    {
+        var swapDimensions = degrees is 90 or 270;
+        var width = swapDimensions ? bitmap.Height : bitmap.Width;
+        var height = swapDimensions ? bitmap.Width : bitmap.Height;
+
+        var rotated = new SKBitmap(width, height);
+        using (var canvas = new SKCanvas(rotated))
+        {
+            // Rotate around the new canvas's center, then shift back by
+            // the original bitmap's center before drawing - this is the
+            // standard "rotate around center" composition and avoids
+            // hand-deriving translate offsets per orientation case.
+            canvas.Translate(width / 2f, height / 2f);
+            canvas.RotateDegrees(degrees);
+            canvas.Translate(-bitmap.Width / 2f, -bitmap.Height / 2f);
+            canvas.DrawBitmap(bitmap, 0, 0);
+        }
+        return rotated;
+    }
+
+    private static SKBitmap FlipHorizontal(SKBitmap bitmap)
+    {
+        var flipped = new SKBitmap(bitmap.Width, bitmap.Height);
+        using (var canvas = new SKCanvas(flipped))
+        {
+            canvas.Scale(-1, 1, bitmap.Width / 2f, 0);
+            canvas.DrawBitmap(bitmap, 0, 0);
+        }
+        return flipped;
+    }
+
+    private static SKBitmap FlipVertical(SKBitmap bitmap)
+    {
+        var flipped = new SKBitmap(bitmap.Width, bitmap.Height);
+        using (var canvas = new SKCanvas(flipped))
+        {
+            canvas.Scale(1, -1, 0, bitmap.Height / 2f);
+            canvas.DrawBitmap(bitmap, 0, 0);
+        }
+        return flipped;
     }
 }

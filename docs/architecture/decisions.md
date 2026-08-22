@@ -383,6 +383,25 @@ Two separate causes:
   gallery regardless of publish status. Rebuilt the page to list every
   published album as tabs and load whichever one is selected.
 
+**Fix:** portrait photos uploaded through the real pipeline (as
+opposed to the Phase 4 seed data, which used a different tool) were
+saved and displayed sideways. Cause: cameras commonly store sensor
+pixel data in a fixed landscape layout and rely on the EXIF
+Orientation tag to tell viewers how to rotate/flip it for correct
+display - SkiaSharp's `SKBitmap.Decode` does not apply this
+automatically, it just returns the raw pixels as stored. The seed
+data happened to go through a tool (Python/Pillow's
+`ImageOps.exif_transpose`) that does apply it, which is why that path
+looked correct while the real upload pipeline didn't. Fixed by reading
+the Orientation tag via MetadataExtractor and physically
+rotating/flipping the decoded bitmap (`ApplyExifOrientation`, covering
+all 8 EXIF orientation values) before generating variants or storing
+`Photo.Width`/`Height` - the corrected dimensions matter too, since
+the frontend's `aspect-ratio` CSS for each photo tile depends on them
+being right. The saved variant files need no orientation tag
+afterward, consistent with the existing choice to strip EXIF from
+served files entirely.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely

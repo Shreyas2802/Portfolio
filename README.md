@@ -122,6 +122,14 @@ shows tabs for every published album. If a photo still isn't showing
 up after this fix, check that its album's "Published" checkbox is
 checked in `/admin/albums`.
 
+**Fix (portrait photos sideways):** portrait photos uploaded through
+the real pipeline were being saved rotated/sideways - the EXIF
+Orientation tag wasn't being applied to the actual pixels. This is
+now fixed for all future uploads. Any photo already uploaded *before*
+this fix and displaying sideways needs to be deleted and re-uploaded
+from `/admin/photos` - existing database rows/files aren't
+automatically corrected.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and
