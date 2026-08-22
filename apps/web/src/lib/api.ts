@@ -54,6 +54,32 @@ export async function apiAuthGet<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+/** Authenticated JSON POST - attaches the admin's JWT if present. */
+export async function apiAuthPostJson<TBody, TResponse>(path: string, body: TBody): Promise<TResponse> {
+  const res = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ApiError(`POST ${path} failed`, res.status)
+  }
+  return (await res.json()) as TResponse
+}
+
+/** Authenticated JSON PUT - attaches the admin's JWT if present. */
+export async function apiAuthPutJson<TBody, TResponse>(path: string, body: TBody): Promise<TResponse> {
+  const res = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ApiError(`PUT ${path} failed`, res.status)
+  }
+  return (await res.json()) as TResponse
+}
+
 /** Authenticated multipart/form-data POST - for the photo upload endpoint. */
 export async function apiAuthPostForm<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`/api${path}`, {

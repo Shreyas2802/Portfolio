@@ -4,6 +4,8 @@ import { useAuth } from '../../features/auth/useAuth'
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/photos', label: 'Photos' },
+  { to: '/admin/albums', label: 'Albums' },
+  { to: '/admin/taxonomy', label: 'Categories & Tags' },
 ] as const
 
 export function AdminLayout() {

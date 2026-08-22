@@ -9,6 +9,8 @@ import { ContactPage } from './routes/ContactPage'
 import { LoginPage } from './routes/admin/LoginPage'
 import { DashboardPage } from './routes/admin/DashboardPage'
 import { PhotosAdminPage } from './routes/admin/PhotosAdminPage'
+import { AlbumsAdminPage } from './routes/admin/AlbumsAdminPage'
+import { TaxonomyAdminPage } from './routes/admin/TaxonomyAdminPage'
 import { ProtectedRoute } from './components/admin/ProtectedRoute'
 import { AdminLayout } from './components/admin/AdminLayout'
 import { AuthProvider } from './features/auth/AuthContext'
@@ -36,6 +38,8 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           { path: 'photos', element: <PhotosAdminPage /> },
+          { path: 'albums', element: <AlbumsAdminPage /> },
+          { path: 'taxonomy', element: <TaxonomyAdminPage /> },
         ],
       },
     ],

@@ -62,6 +62,9 @@ builder.Services.AddScoped<IContactMessageService, ContactMessageService>();
 builder.Services.AddScoped<IPhotographyQueryService, PhotographyQueryService>();
 builder.Services.AddScoped<IPhotoStorageService, LocalPhotoStorageService>();
 builder.Services.AddScoped<IPhotoUploadService, PhotoUploadService>();
+builder.Services.AddScoped<IAlbumManagementService, AlbumManagementService>();
+builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
+builder.Services.AddScoped<ITagManagementService, TagManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 

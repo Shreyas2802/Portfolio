@@ -16,13 +16,16 @@ public class PhotographyController : ControllerBase
 {
     private readonly IPhotographyQueryService _photographyQueryService;
     private readonly IPhotoUploadService _photoUploadService;
+    private readonly IAlbumManagementService _albumManagementService;
 
     public PhotographyController(
         IPhotographyQueryService photographyQueryService,
-        IPhotoUploadService photoUploadService)
+        IPhotoUploadService photoUploadService,
+        IAlbumManagementService albumManagementService)
     {
         _photographyQueryService = photographyQueryService;
         _photoUploadService = photoUploadService;
+        _albumManagementService = albumManagementService;
     }
 
     [HttpGet("albums")]
@@ -98,6 +101,46 @@ public class PhotographyController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var deleted = await _photoUploadService.DeleteAsync(id, cancellationToken);
+        if (!deleted)
+        {
+            return NotFound();
+        }
+        return NoContent();
+    }
+
+    [HttpGet("albums/admin/all")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAllAlbumsForAdmin(CancellationToken cancellationToken)
+    {
+        var albums = await _albumManagementService.GetAllForAdminAsync(cancellationToken);
+        return Ok(albums);
+    }
+
+    [HttpPost("albums")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateAlbum([FromBody] AlbumCreateRequest request, CancellationToken cancellationToken)
+    {
+        var album = await _albumManagementService.CreateAsync(request, cancellationToken);
+        return Ok(album);
+    }
+
+    [HttpPut("albums/{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateAlbum(int id, [FromBody] AlbumUpdateRequest request, CancellationToken cancellationToken)
+    {
+        var album = await _albumManagementService.UpdateAsync(id, request, cancellationToken);
+        if (album is null)
+        {
+            return NotFound();
+        }
+        return Ok(album);
+    }
+
+    [HttpDelete("albums/{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteAlbum(int id, CancellationToken cancellationToken)
+    {
+        var deleted = await _albumManagementService.DeleteAsync(id, cancellationToken);
         if (!deleted)
         {
             return NotFound();

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiAuthDelete, apiAuthGet, apiAuthPostForm } from '../../lib/api'
 import type { Photo } from '../photography/types'
-import type { AlbumSummary } from '../photography/types'
+import type { AlbumAdmin } from './useAdminAlbums'
 
 export function useAdminPhotos() {
   return useQuery({
@@ -10,10 +10,17 @@ export function useAdminPhotos() {
   })
 }
 
+/**
+ * Used by the upload form's album picker. Deliberately hits the admin
+ * "all albums" endpoint, not the public one - the public endpoint only
+ * returns published albums, which meant a newly created (or
+ * intentionally unpublished) album never showed up here to upload
+ * into.
+ */
 export function useAdminAlbums() {
   return useQuery({
     queryKey: ['admin-albums'],
-    queryFn: () => apiAuthGet<AlbumSummary[]>('/photography/albums'),
+    queryFn: () => apiAuthGet<AlbumAdmin[]>('/photography/albums/admin/all'),
   })
 }
 

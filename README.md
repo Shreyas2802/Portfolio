@@ -105,6 +105,15 @@ button on hover. This finally replaces Postman for day-to-day use —
 Postman/curl are still useful for testing the API directly, but aren't
 required anymore.
 
+Phase 6c adds Album, Category, and Tag management (no new migration
+needed - same entities as Phase 6a). `/admin/albums` now lets you
+create new albums, edit existing ones, and delete them (which also
+removes their photos and files). `/admin/taxonomy` manages Categories
+and Tags. Note: assigning tags to individual photos isn't built yet -
+that needs a photo-edit screen, which doesn't exist yet either (today
+you can upload and delete photos, not edit their details after the
+fact).
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

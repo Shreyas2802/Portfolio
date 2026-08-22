@@ -323,6 +323,50 @@ file is already missing.
 record, which is the part that actually matters to the admin - an
 already-gone file isn't a real error worth surfacing.
 
+---
+
+## Phase 6c — Album, Category, and Tag management
+**Decision:** Album `Slug` is never regenerated on an edit, even when
+the title changes.
+**Why:** once an album is published, its URL should stay stable - a
+title tweak shouldn't silently break a link someone already shared or
+bookmarked. Only the initial create generates a slug.
+
+**Decision:** Deleting an album deletes each contained photo's variant
+files from disk first, then removes the album (which cascade-deletes
+the photo rows).
+**Why:** without this, cascade-delete would remove the database rows
+but leave the actual image files orphaned on disk with nothing
+pointing at them - the same orphan-file problem the Phase 5 upload
+rollback logic exists to prevent, just triggered from a different
+direction.
+
+**Decision:** Deleting a category does not delete its albums - the
+existing `DeleteBehavior.SetNull` on `Album.CategoryId` (from Phase 4)
+means albums simply become uncategorized.
+**Why:** a category is organizational metadata, not a container - an
+album's photos are the real content and shouldn't be threatened by
+deleting an unrelated grouping label.
+
+**Decision:** Tag management (create/list/delete) is built, but
+assigning tags to individual photos is not wired into the upload form
+yet.
+**Why:** honest scope-matching - today's admin only supports upload
+and delete for photos, not edit, so there's no natural place yet for
+a tag picker. This satisfies the spec's "tag management" bullet at the
+entity level; per-photo tagging is a natural follow-up once a photo-
+edit screen exists.
+
+**Decision:** Found and fixed a bug while building this: the photo
+upload form's album dropdown was calling the *public* albums endpoint,
+which only returns published albums - so a newly created (or
+deliberately unpublished) album never appeared as an upload target.
+Switched it to the new admin "all albums" endpoint.
+**Why:** this is exactly the "why can I only see one album" issue
+flagged before this phase started - there was always meant to be a
+way to create more, the admin UI just wasn't querying the right
+endpoint to see them once created.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely
