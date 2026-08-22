@@ -40,6 +40,7 @@ export interface UploadPhotoInput {
   title: string
   caption: string
   albumId: number
+  tagIds: number[]
 }
 
 export function useUploadPhoto() {
@@ -51,6 +52,7 @@ export function useUploadPhoto() {
       formData.append('title', input.title)
       formData.append('caption', input.caption)
       formData.append('albumId', String(input.albumId))
+      input.tagIds.forEach((id) => formData.append('tagIds', String(id)))
       return apiAuthPostForm<Photo>('/photography/upload', formData)
     },
     onSuccess: () => {

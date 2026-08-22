@@ -16,6 +16,7 @@ export interface Photo {
   shutterSpeed: string | null
   iso: number | null
   focalLengthMm: number | null
+  tagNames: string[]
 }
 
 export interface AlbumSummary {

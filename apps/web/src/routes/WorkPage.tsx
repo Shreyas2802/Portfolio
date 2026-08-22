@@ -3,25 +3,55 @@ import { DataLabel } from '../components/ui/DataLabel'
 import { Lightbox } from '../components/ui/Lightbox'
 import { useAlbums, useAlbum } from '../features/photography/usePhotography'
 
+/**
+ * Gallery page. Shows every published album as a set of tabs, not
+ * just the first one - an earlier version only ever fetched
+ * albums[0], so a second (or third...) published album was invisible
+ * here even though it existed and had photos. Selecting a tab loads
+ * that album's photos.
+ */
 export function WorkPage() {
   const { data: albums, isLoading: albumsLoading } = useAlbums()
-  const firstAlbumSlug = albums?.[0]?.slug
-  const { data: album, isLoading: albumLoading } = useAlbum(firstAlbumSlug)
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
+  const activeSlug = selectedSlug ?? albums?.[0]?.slug
+  const { data: album, isLoading: albumLoading } = useAlbum(activeSlug)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
-  const isLoading = albumsLoading || (Boolean(firstAlbumSlug) && albumLoading)
+  const isLoading = albumsLoading || (Boolean(activeSlug) && albumLoading)
 
   return (
     <section className="mx-auto max-w-[1600px] px-6 py-24 sm:px-10">
       <DataLabel items={['PHOTOGRAPHY']} />
       <h1 className="mt-6 text-4xl font-semibold tracking-tight">Photography</h1>
 
+      {albums && albums.length > 1 && (
+        <div className="mt-8 flex flex-wrap gap-2">
+          {albums.map((a) => (
+            <button
+              key={a.slug}
+              type="button"
+              onClick={() => {
+                setSelectedSlug(a.slug)
+                setActiveIndex(null)
+              }}
+              className={`data-label rounded-full border px-4 py-2 transition-colors ${
+                a.slug === activeSlug
+                  ? 'border-[var(--color-brass)] text-[var(--color-brass)]'
+                  : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {a.title} ({a.photoCount})
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading && (
-        <p className="mt-4 text-[var(--color-ink-muted)]">Loading gallery…</p>
+        <p className="mt-8 text-[var(--color-ink-muted)]">Loading gallery…</p>
       )}
 
       {!isLoading && !album && (
-        <p className="mt-4 text-[var(--color-ink-muted)]">
+        <p className="mt-8 text-[var(--color-ink-muted)]">
           No published albums yet — check back soon.
         </p>
       )}

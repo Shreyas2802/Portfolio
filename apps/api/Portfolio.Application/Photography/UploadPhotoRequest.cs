@@ -22,6 +22,8 @@ public class UploadPhotoRequest
 
     [Required]
     public int AlbumId { get; set; }
+
+    public List<int> TagIds { get; set; } = new();
 }
 
 public class UploadPhotoResult

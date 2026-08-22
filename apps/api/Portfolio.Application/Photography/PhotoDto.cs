@@ -25,4 +25,5 @@ public class PhotoDto
     public string? ShutterSpeed { get; set; }
     public int? Iso { get; set; }
     public decimal? FocalLengthMm { get; set; }
+    public List<string> TagNames { get; set; } = new();
 }

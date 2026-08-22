@@ -40,6 +40,7 @@ public class PhotographyQueryService : IPhotographyQueryService
         var album = await _dbContext.Albums
             .Include(a => a.Category)
             .Include(a => a.Photos.OrderBy(p => p.DisplayOrder))
+                .ThenInclude(p => p.Tags)
             .FirstOrDefaultAsync(a => a.Slug == slug && a.IsPublished, cancellationToken);
 
         if (album is null)
@@ -61,6 +62,7 @@ public class PhotographyQueryService : IPhotographyQueryService
     public async Task<List<PhotoDto>> GetFeaturedPhotosAsync(int count, CancellationToken cancellationToken)
     {
         var photos = await _dbContext.Photos
+            .Include(p => p.Tags)
             .Where(p => p.IsPublished)
             .OrderBy(p => p.DisplayOrder)
             .Take(count)
@@ -72,6 +74,7 @@ public class PhotographyQueryService : IPhotographyQueryService
     public async Task<List<PhotoDto>> GetAllPhotosAsync(CancellationToken cancellationToken)
     {
         var photos = await _dbContext.Photos
+            .Include(p => p.Tags)
             .OrderByDescending(p => p.UploadedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -97,5 +100,6 @@ public class PhotographyQueryService : IPhotographyQueryService
         ShutterSpeed = p.ShutterSpeed,
         Iso = p.Iso,
         FocalLengthMm = p.FocalLengthMm,
+        TagNames = p.Tags.Select(t => t.Name).ToList(),
     };
 }

@@ -111,6 +111,17 @@ public class PhotoUploadService : IPhotoUploadService
                 UploadedAtUtc = DateTime.UtcNow,
             };
 
+            if (request.TagIds.Count > 0)
+            {
+                var tags = await _dbContext.Tags
+                    .Where(t => request.TagIds.Contains(t.Id))
+                    .ToListAsync(cancellationToken);
+                foreach (var tag in tags)
+                {
+                    photo.Tags.Add(tag);
+                }
+            }
+
             _dbContext.Photos.Add(photo);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -136,6 +147,7 @@ public class PhotoUploadService : IPhotoUploadService
                     ShutterSpeed = photo.ShutterSpeed,
                     Iso = photo.Iso,
                     FocalLengthMm = photo.FocalLengthMm,
+                    TagNames = photo.Tags.Select(t => t.Name).ToList(),
                 },
             };
         }

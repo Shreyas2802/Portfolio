@@ -367,6 +367,22 @@ flagged before this phase started - there was always meant to be a
 way to create more, the admin UI just wasn't querying the right
 endpoint to see them once created.
 
+**Fix:** the upload form asked for Album but not Tags, and uploading a
+photo into a second album never showed up on the public `/work` page.
+Two separate causes:
+- Tags simply weren't wired into the upload form or the upload
+  service at all - added a tag multi-select to the form, `TagIds` on
+  `UploadPhotoRequest`, and assignment to `Photo.Tags` before saving.
+  Category was intentionally left off this form - Category groups
+  Albums, not individual Photos, so it's set at the album level (see
+  Phase 4), not per-upload.
+- `WorkPage` only ever fetched `albums?.[0]?.slug` - the very first
+  album returned, full stop. With only one album ever existing before
+  this phase, that bug was invisible; the moment a second album
+  existed, its photos became permanently unreachable from the public
+  gallery regardless of publish status. Rebuilt the page to list every
+  published album as tabs and load whichever one is selected.
+
 **Decision:** Lightbox is full-bleed - the photo fills the entire
 viewport (against `100% × 100%`), and all chrome (close button,
 counter, caption, EXIF, full-resolution link) is an absolutely

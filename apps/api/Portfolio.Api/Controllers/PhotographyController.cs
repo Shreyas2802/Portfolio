@@ -70,6 +70,7 @@ public class PhotographyController : ControllerBase
         [FromForm] string title,
         [FromForm] string? caption,
         [FromForm] int albumId,
+        [FromForm] List<int>? tagIds,
         CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
@@ -85,6 +86,7 @@ public class PhotographyController : ControllerBase
                 Title = title,
                 Caption = caption ?? string.Empty,
                 AlbumId = albumId,
+                TagIds = tagIds ?? new List<int>(),
             },
             cancellationToken);
 

@@ -6,6 +6,7 @@ import {
   useDeletePhoto,
   useUploadPhoto,
 } from '../../features/admin/useAdminPhotos'
+import { useTags } from '../../features/admin/useAdminTaxonomy'
 import { ApiError } from '../../lib/api'
 
 export function PhotosAdminPage() {
@@ -22,23 +23,30 @@ export function PhotosAdminPage() {
 
 function UploadForm() {
   const { data: albums } = useAdminAlbums()
+  const { data: tags } = useTags()
   const uploadMutation = useUploadPhoto()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [caption, setCaption] = useState('')
   const [albumId, setAlbumId] = useState<number | ''>('')
+  const [tagIds, setTagIds] = useState<number[]>([])
+
+  function toggleTag(id: number) {
+    setTagIds((current) => (current.includes(id) ? current.filter((t) => t !== id) : [...current, id]))
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!file || !albumId) return
     uploadMutation.mutate(
-      { file, title, caption, albumId },
+      { file, title, caption, albumId, tagIds },
       {
         onSuccess: () => {
           setFile(null)
           setTitle('')
           setCaption('')
+          setTagIds([])
           if (fileInputRef.current) fileInputRef.current.value = ''
         },
       },
@@ -107,6 +115,32 @@ function UploadForm() {
           ))}
         </select>
       </div>
+
+      {tags && tags.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="data-label">Tags</span>
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <label
+                key={tag.id}
+                className={`data-label cursor-pointer rounded-full border px-3 py-1 transition-colors ${
+                  tagIds.includes(tag.id)
+                    ? 'border-[var(--color-brass)] text-[var(--color-brass)]'
+                    : 'border-[var(--color-line)] text-[var(--color-ink-muted)]'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={tagIds.includes(tag.id)}
+                  onChange={() => toggleTag(tag.id)}
+                  className="sr-only"
+                />
+                {tag.name}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button
         type="submit"

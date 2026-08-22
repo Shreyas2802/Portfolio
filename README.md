@@ -114,6 +114,14 @@ that needs a photo-edit screen, which doesn't exist yet either (today
 you can upload and delete photos, not edit their details after the
 fact).
 
+**Fix (same phase):** the upload form now includes a tag picker (Tags
+apply to individual photos; Category applies to the album as a whole,
+set when creating/editing the album, not per-photo). Also fixed: the
+public `/work` gallery only ever showed the *first* album - it now
+shows tabs for every published album. If a photo still isn't showing
+up after this fix, check that its album's "Published" checkbox is
+checked in `/admin/albums`.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and
