@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Portfolio.Application.Contact;
 
 namespace Portfolio.Api.Controllers;
@@ -21,6 +22,7 @@ public class ContactController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting("contact")]
     public async Task<IActionResult> Submit(
         [FromBody] SubmitContactMessageRequest request,
         CancellationToken cancellationToken)

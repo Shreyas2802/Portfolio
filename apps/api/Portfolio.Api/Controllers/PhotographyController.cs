@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Portfolio.Application.Photography;
 
 namespace Portfolio.Api.Controllers;
@@ -64,6 +65,7 @@ public class PhotographyController : ControllerBase
 
     [HttpPost("upload")]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("upload")]
     [RequestSizeLimit(30 * 1024 * 1024)]
     public async Task<IActionResult> Upload(
         [FromForm] IFormFile file,

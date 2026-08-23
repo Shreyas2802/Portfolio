@@ -486,3 +486,105 @@ break because the title changed.
 This completes Phase 6 (Admin): Identity, Login, Authorization,
 Dashboard, and management for Photos, Albums, Categories, Tags, and
 Projects.
+
+---
+
+## Phase 7 — Hardening
+
+**Decision:** `SecurityHeadersMiddleware` sets X-Content-Type-Options,
+Referrer-Policy, Permissions-Policy, X-Frame-Options, and a CSP built
+around what this API actually serves (JSON + self-hosted images, no
+inline scripts, no third-party CDNs, no external fonts) rather than a
+generic copied CSP. HSTS is added only outside Development.
+**Caveat, stated plainly:** in local dev, the SPA's actual HTML page
+is served by Vite (port 5173), not this API - these headers protect
+the API's own responses but don't cover the document the browser
+renders until something in this pipeline serves that document too.
+Phase 10 (Deployment) needs to either have this API serve the built
+SPA as well, or replicate equivalent headers on whatever host does.
+
+**Decision:** CORS policy (`DevClient`) allows only
+`http://localhost:5173`, no `AllowAnyOrigin()`, no
+`AllowCredentials()`.
+**Why:** matches the spec's explicit warning against
+`AllowAnyOrigin()` with credentials. Not using cookies for auth means
+that specific dangerous combination doesn't apply here regardless, but
+the policy stays exact-origin anyway rather than relying on that
+technicality. Phase 10 adds the real production origin here.
+
+**Decision:** No CSRF/antiforgery tokens added.
+**Why:** the spec scopes this requirement explicitly to
+"cookie-authenticated state-changing requests." Auth here is a JWT
+sent via the `Authorization` header (Phase 6), not a cookie - a
+malicious cross-site page cannot make the browser attach that header
+automatically the way it would a cookie, which is the entire
+mechanism CSRF exploits. Antiforgery tokens would be solving a problem
+this architecture doesn't have.
+
+**Decision:** Rate limiting added to exactly the three endpoints that
+apply from the spec's list (Login: 5/min, Contact: 5/hour, Upload:
+20/hour, all partitioned per-IP) - not Password recovery (doesn't
+exist) or Bulk operations (doesn't exist). Static image delivery and
+ordinary GETs are deliberately NOT rate-limited, per the spec's own
+explicit instruction not to make gallery browsing unpleasant.
+
+**Decision:** Added a global Kestrel `MaxRequestBodySize` (30MB) on
+top of the existing per-endpoint `[RequestSizeLimit]` on Upload.
+**Why:** the attribute only ever protected the one endpoint it's on;
+the global limit is defense-in-depth for every other endpoint (Login,
+Contact, etc.) against an oversized request body.
+
+**Decision:** Added a 50-megapixel cap on decoded image dimensions in
+`PhotoUploadService`, checked immediately after decode.
+**Why:** the spec explicitly calls for a "maximum pixel dimensions"
+safeguard - a small file can still decode to an enormous pixel grid (a
+decompression bomb), making the resize step expensive regardless of
+the file's byte size, which the existing 25MB file-size cap alone
+doesn't prevent.
+
+**Already satisfied by earlier decisions (documented here rather than
+re-implemented):**
+- **Dangerous file types** (.exe/.dll/.php/.js/.html/.svg): the
+  upload pipeline validates by actually decoding the bytes as an
+  image (Phase 5) - none of these formats decode as a raster image,
+  so they're already rejected. This is stricter than an extension
+  blocklist, which only checks the filename and can be trivially
+  renamed around.
+- **SVG's active-content risk** specifically: SVG is vector XML, not
+  something `SKBitmap.Decode` parses as pixel data at all - it fails
+  the same decode check.
+- **Storing uploads outside executable paths:** unlike a PHP/Apache
+  stack, ASP.NET Core's static file middleware never executes files
+  from `wwwroot` as code regardless of extension - the classic
+  "upload a `.php` shell into the webroot" attack doesn't apply to
+  how this server serves static files.
+- **Original filenames never used in storage paths:** every variant
+  is saved as a fixed `thumb.jpg`/`medium.jpg`/`large.jpg` under a
+  generated slug folder (Phase 5) - nothing from the uploaded
+  filename ever reaches the filesystem path, closing off path-
+  traversal-via-filename as a category entirely.
+- **Error handling / no leaked stack traces:** `AddProblemDetails()` +
+  `UseDeveloperExceptionPage()` (dev only) / `UseExceptionHandler()`
+  (everywhere else) were added in Phase 2, before there were even any
+  controllers to leak from.
+
+**Decision:** `SafeUrlValidator` restricts `Project.GithubUrl`/
+`LiveUrl` to absolute `http://`/`https://` URLs only, checked in
+`ProjectsController` before create/update.
+**Why:** these fields are rendered as real anchor `href`s on the
+public site - an unrestricted string would let a `javascript:` URL
+through, a live XSS vector the moment a visitor clicks the link.
+
+**Decision:** Failed login attempts are now logged as a warning
+(username only, timestamp implicit in the log entry) - never the
+password, in either the unknown-username or wrong-password case.
+**Why:** the spec explicitly calls for contact-form and (by extension)
+security-relevant logging "without exposing sensitive data" - visible
+failed-login patterns are useful for noticing brute-force attempts;
+logging the attempted password would itself be a security bug.
+
+**Dependency audit:** `npm audit` on the frontend: 0 vulnerabilities.
+Backend `dotnet list package --vulnerable --include-transitive`
+couldn't be run in this environment (no .NET SDK in this sandbox,
+same limitation noted since Phase 0) - run it locally and report back
+if anything shows up.

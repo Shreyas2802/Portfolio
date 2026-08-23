@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Portfolio.Application.Projects;
+using Portfolio.Application.Validation;
 
 namespace Portfolio.Api.Controllers;
 
@@ -49,6 +50,11 @@ public class ProjectsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] ProjectRequest request, CancellationToken cancellationToken)
     {
+        if (!IsValidUrls(request, out var error))
+        {
+            return BadRequest(new { error });
+        }
+
         var project = await _projectManagementService.CreateAsync(request, cancellationToken);
         return Ok(project);
     }
@@ -57,6 +63,11 @@ public class ProjectsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] ProjectRequest request, CancellationToken cancellationToken)
     {
+        if (!IsValidUrls(request, out var error))
+        {
+            return BadRequest(new { error });
+        }
+
         var project = await _projectManagementService.UpdateAsync(id, request, cancellationToken);
         if (project is null)
         {
@@ -75,5 +86,16 @@ public class ProjectsController : ControllerBase
             return NotFound();
         }
         return NoContent();
+    }
+
+    private static bool IsValidUrls(ProjectRequest request, out string? error)
+    {
+        if (!SafeUrlValidator.IsSafe(request.GithubUrl) || !SafeUrlValidator.IsSafe(request.LiveUrl))
+        {
+            error = "GitHub URL and Live URL must be valid http:// or https:// links.";
+            return false;
+        }
+        error = null;
+        return true;
     }
 }

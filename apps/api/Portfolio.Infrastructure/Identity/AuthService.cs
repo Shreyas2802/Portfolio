@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Portfolio.Application.Auth;
 
@@ -21,11 +22,13 @@ public class AuthService : IAuthService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(UserManager<ApplicationUser> userManager, IConfiguration configuration)
+    public AuthService(UserManager<ApplicationUser> userManager, IConfiguration configuration, ILogger<AuthService> logger)
     {
         _userManager = userManager;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
@@ -33,12 +36,17 @@ public class AuthService : IAuthService
         var user = await _userManager.FindByNameAsync(request.Username);
         if (user is null)
         {
+            // Username only, never the password - logging credentials
+            // (even failed ones) is exactly the "exposing sensitive
+            // data" the spec warns against.
+            _logger.LogWarning("Failed login attempt for unknown username {Username}", request.Username);
             return new LoginResult { Success = false };
         }
 
         var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!passwordValid)
         {
+            _logger.LogWarning("Failed login attempt for username {Username}", request.Username);
             return new LoginResult { Success = false };
         }
 

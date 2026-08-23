@@ -144,6 +144,27 @@ create/edit/delete, including a "Featured" toggle that controls
 whether a project shows as a large case-study card or a smaller
 "other work" entry.
 
+Phase 7 (Hardening) adds no new entities - no migration needed. Verify
+it after pulling:
+```bash
+# Rate limiting: try logging in with a wrong password 6 times quickly -
+# the 6th attempt should return 429 Too Many Requests instead of 401.
+
+# Security headers: check any API response
+curl -I http://localhost:5199/api/photography/albums
+# Should include X-Content-Type-Options, Referrer-Policy,
+# Permissions-Policy, X-Frame-Options, and Content-Security-Policy.
+
+# Dependency audit (run locally - not run here, no .NET SDK in this sandbox):
+cd apps/api
+dotnet list package --vulnerable --include-transitive
+```
+Note: the security headers above apply to the API's own responses.
+They do **not** currently apply to the React app's HTML page itself,
+since that's served by Vite's dev server (a different process/port)
+in local development - see the architecture decision log for why, and
+what Phase 10 needs to do about it.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

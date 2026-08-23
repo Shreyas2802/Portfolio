@@ -1,8 +1,11 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Portfolio.Api.Middleware;
 using Portfolio.Application.Admin;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Contact;
@@ -18,9 +21,74 @@ using Portfolio.Infrastructure.Projects;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Global request body size cap - defense in depth beyond the
+// per-endpoint [RequestSizeLimit] on Upload. Protects every endpoint
+// (Contact, Login, etc.) from an oversized request body, not just the
+// one already-guarded upload action.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30 MB
+});
+
 // --- Services -------------------------------------------------------
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+const string DevClientCorsPolicy = "DevClient";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(DevClientCorsPolicy, policy =>
+    {
+        // Only the Vite dev origin - never AllowAnyOrigin(). No
+        // AllowCredentials() either: auth is a JWT sent via the
+        // Authorization header, not a cookie, so credentialed CORS
+        // (the specifically dangerous combination the spec calls out)
+        // doesn't apply here at all. Phase 10 (Deployment) adds the
+        // real production frontend origin to this list - or removes
+        // the need for CORS entirely if frontend and API end up
+        // served from the same origin, which the spec prefers.
+        policy.WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Matches the spec's explicit list: Login, Contact form, and
+    // Upload are rate-limited; static image delivery and ordinary
+    // GETs are deliberately left alone so gallery browsing stays
+    // pleasant. Partitioned by IP so one abusive client can't exhaust
+    // the limit for everyone else.
+    options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+
+    options.AddPolicy("contact", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0,
+        }));
+
+    options.AddPolicy("upload", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromHours(1),
+            QueueLimit = 0,
+        }));
+});
 
 builder.Services.AddDbContext<PortfolioDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -114,8 +182,11 @@ using (var identitySeedScope = app.Services.CreateScope())
     await IdentitySeeder.SeedAsync(userManager, roleManager, builder.Configuration, logger);
 }
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseCors(DevClientCorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

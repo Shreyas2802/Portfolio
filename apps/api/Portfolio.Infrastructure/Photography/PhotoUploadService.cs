@@ -73,6 +73,18 @@ public class PhotoUploadService : IPhotoUploadService
                 "HEIC (common on iPhone) and RAW formats aren't supported - convert to JPEG first.");
         }
 
+        // Resource-exhaustion safeguard: a tiny file can still decode to
+        // an enormous pixel grid (a "decompression bomb"), which would
+        // make the resize step below expensive regardless of the file's
+        // byte size. 50 megapixels comfortably covers this site's real
+        // camera (Sony A6000, 24MP) with generous headroom.
+        const long maxPixels = 50_000_000;
+        if ((long)decoded.Width * decoded.Height > maxPixels)
+        {
+            decoded.Dispose();
+            return Fail("Image dimensions are too large to process (max ~50 megapixels).");
+        }
+
         try
         {
             var exif = ExtractExif(bytes);
