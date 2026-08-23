@@ -102,8 +102,11 @@ public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.ShortDescription).HasMaxLength(500);
-            entity.Property(e => e.Description).HasMaxLength(4000);
+            entity.Property(e => e.Tagline).HasMaxLength(500);
+            entity.Property(e => e.Role).HasMaxLength(300);
+            entity.Property(e => e.Status).HasMaxLength(300);
+            entity.Property(e => e.Overview).HasMaxLength(4000);
+            entity.Property(e => e.ContributionsText).HasMaxLength(4000);
             entity.Property(e => e.Technologies).HasMaxLength(500);
             entity.Property(e => e.GithubUrl).HasMaxLength(500);
             entity.Property(e => e.LiveUrl).HasMaxLength(500);

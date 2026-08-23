@@ -7,12 +7,14 @@ using Portfolio.Application.Admin;
 using Portfolio.Application.Auth;
 using Portfolio.Application.Contact;
 using Portfolio.Application.Photography;
+using Portfolio.Application.Projects;
 using Portfolio.Infrastructure.Admin;
 using Portfolio.Infrastructure.Contact;
 using Portfolio.Infrastructure.Identity;
 using Portfolio.Infrastructure.Persistence;
 using Portfolio.Infrastructure.Persistence.Seed;
 using Portfolio.Infrastructure.Photography;
+using Portfolio.Infrastructure.Projects;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,6 +67,8 @@ builder.Services.AddScoped<IPhotoUploadService, PhotoUploadService>();
 builder.Services.AddScoped<IAlbumManagementService, AlbumManagementService>();
 builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
 builder.Services.AddScoped<ITagManagementService, TagManagementService>();
+builder.Services.AddScoped<IProjectQueryService, ProjectQueryService>();
+builder.Services.AddScoped<IProjectManagementService, ProjectManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 
@@ -91,6 +95,7 @@ if (app.Environment.IsDevelopment())
     using var photoSeedScope = app.Services.CreateScope();
     var dbContext = photoSeedScope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
     await DbSeeder.SeedAsync(dbContext);
+    await ProjectSeeder.SeedAsync(dbContext);
 }
 else
 {

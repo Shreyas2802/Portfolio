@@ -454,3 +454,35 @@ before upload (or setting the iPhone's capture format to "Most
 Compatible" in Settings > Camera > Formats) is the standard, low-
 friction answer most sites take instead of building a custom decode
 pipeline for it.
+
+---
+
+## Phase 6d — Project management (final piece of Phase 6)
+**Decision:** `ContributionsText` is stored as one bullet per line in a
+single text column, not a normalized `ProjectContribution` child
+table. Same reasoning as Photo/Album from earlier phases: a handful of
+short lines per project doesn't justify the join/CRUD overhead a
+proper child table would add.
+
+**Decision:** `IsFeatured` (bool) distinguishes the two prominent case-
+study cards from the smaller "other work" list, rather than two
+separate entities or a numeric priority field.
+**Why:** matches exactly how the public page already presented this
+content since Phase 3 - a boolean is the simplest thing that captures
+the actual distinction being made.
+
+**Decision:** Seeded the five projects that previously lived as
+static frontend data (`src/data/projects.ts`, deleted this phase) into
+the database via `ProjectSeeder`, idempotent like `DbSeeder`.
+**Why:** switching the public page from static data to an API call
+would otherwise make it go blank on first run after this phase -
+this preserves the real content already written in Phase 3 as the
+starting database state, which the admin can now edit going forward.
+
+**Decision:** Slug is never regenerated on a project rename, same
+reasoning as Album (Phase 6c) - a published project's URL shouldn't
+break because the title changed.
+
+This completes Phase 6 (Admin): Identity, Login, Authorization,
+Dashboard, and management for Photos, Albums, Categories, Tags, and
+Projects.

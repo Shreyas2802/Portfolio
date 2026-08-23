@@ -130,6 +130,20 @@ this fix and displaying sideways needs to be deleted and re-uploaded
 from `/admin/photos` - existing database rows/files aren't
 automatically corrected.
 
+Phase 6d (Project management, the final piece of Phase 6) changes the
+`Project` entity's shape - add and apply a new migration:
+```bash
+dotnet ef migrations add UpdateProjectFields --project Portfolio.Infrastructure --startup-project Portfolio.Api
+dotnet ef database update --project Portfolio.Infrastructure --startup-project Portfolio.Api
+```
+On next run, the five projects that used to live as static frontend
+data are seeded into the database automatically (once, like the photo
+seed). The public `/projects` page and project detail pages now come
+from the API instead of a hardcoded file. `/admin/projects` has full
+create/edit/delete, including a "Featured" toggle that controls
+whether a project shows as a large case-study card or a smaller
+"other work" entry.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

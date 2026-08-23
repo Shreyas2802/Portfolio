@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/admin/photos', label: 'Photos' },
   { to: '/admin/albums', label: 'Albums' },
   { to: '/admin/taxonomy', label: 'Categories & Tags' },
+  { to: '/admin/projects', label: 'Projects' },
 ] as const
 
 export function AdminLayout() {

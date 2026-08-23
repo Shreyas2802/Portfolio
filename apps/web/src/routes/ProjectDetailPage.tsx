@@ -1,12 +1,20 @@
 import { Link, useParams } from 'react-router-dom'
 import { DataLabel } from '../components/ui/DataLabel'
-import { getProjectBySlug } from '../data/projects'
+import { useProject } from '../features/projects/usePublicProjects'
 
 export function ProjectDetailPage() {
   const { slug } = useParams<{ slug: string }>()
-  const project = slug ? getProjectBySlug(slug) : undefined
+  const { data: project, isLoading, isError } = useProject(slug)
 
-  if (!project) {
+  if (isLoading) {
+    return (
+      <section className="mx-auto max-w-[1000px] px-6 py-24 sm:px-10">
+        <p className="text-[var(--color-ink-muted)]">Loading…</p>
+      </section>
+    )
+  }
+
+  if (isError || !project) {
     return (
       <section className="mx-auto max-w-[1600px] px-6 py-24 sm:px-10">
         <DataLabel items={['NOT FOUND']} />
@@ -29,7 +37,7 @@ export function ProjectDetailPage() {
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">{project.tagline}</p>
 
       <div className="mt-8 flex flex-wrap gap-2">
-        {project.tech.map((t) => (
+        {project.technologies.map((t) => (
           <span
             key={t}
             className="data-label rounded-full border border-[var(--color-line)] px-3 py-1"
@@ -39,29 +47,58 @@ export function ProjectDetailPage() {
         ))}
       </div>
 
+      {(project.githubUrl || project.liveUrl) && (
+        <div className="mt-6 flex gap-4">
+          {project.githubUrl && (
+            <a
+              href={project.githubUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="data-label text-[var(--color-brass)] hover:opacity-80"
+            >
+              View source ↗
+            </a>
+          )}
+          {project.liveUrl && (
+            <a
+              href={project.liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="data-label text-[var(--color-brass)] hover:opacity-80"
+            >
+              View live ↗
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="mt-12 border-t border-[var(--color-line)] pt-12">
         <DataLabel items={['OVERVIEW']} />
         <p className="mt-4 text-[var(--color-ink)]">{project.overview}</p>
       </div>
 
-      <div className="mt-12 border-t border-[var(--color-line)] pt-12">
-        <DataLabel items={['ROLE']} />
-        <p className="mt-4 text-[var(--color-ink)]">{project.role}</p>
-      </div>
+      {project.role && (
+        <div className="mt-12 border-t border-[var(--color-line)] pt-12">
+          <DataLabel items={['ROLE']} />
+          <p className="mt-4 text-[var(--color-ink)]">{project.role}</p>
+        </div>
+      )}
 
-      <div className="mt-12 border-t border-[var(--color-line)] pt-12">
-        <DataLabel items={['KEY CONTRIBUTIONS']} />
-        <ul className="mt-4 flex flex-col gap-3">
-          {project.contributions.map((point) => (
-            <li
-              key={point}
-              className="pl-4 text-[var(--color-ink-muted)] before:float-left before:-ml-4 before:text-[var(--color-brass)] before:content-['—_']"
-            >
-              {point}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {project.contributions.length > 0 && (
+        <div className="mt-12 border-t border-[var(--color-line)] pt-12">
+          <DataLabel items={['KEY CONTRIBUTIONS']} />
+          <ul className="mt-4 flex flex-col gap-3">
+            {project.contributions.map((point) => (
+              <li
+                key={point}
+                className="pl-4 text-[var(--color-ink-muted)] before:float-left before:-ml-4 before:text-[var(--color-brass)] before:content-['—_']"
+              >
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   )
 }
