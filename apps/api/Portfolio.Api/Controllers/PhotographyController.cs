@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 using Portfolio.Application.Photography;
 
@@ -10,6 +11,12 @@ namespace Portfolio.Api.Controllers;
 /// Upload is now protected by real Identity-based authorization
 /// (Phase 6) - this replaces the temporary X-Admin-Key header check
 /// from Phase 5, which existed only because Identity didn't exist yet.
+///
+/// Public GET endpoints use a short (60s) output cache (Phase 8) - a
+/// visitor browsing the gallery hits the cache, not the database, on
+/// repeat requests within that window. Admin endpoints are never
+/// cached, so changes made through the admin UI are always immediately
+/// visible there.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -30,6 +37,7 @@ public class PhotographyController : ControllerBase
     }
 
     [HttpGet("albums")]
+    [OutputCache(PolicyName = "Public60s")]
     public async Task<IActionResult> GetAlbums(CancellationToken cancellationToken)
     {
         var albums = await _photographyQueryService.GetAlbumsAsync(cancellationToken);
@@ -37,6 +45,7 @@ public class PhotographyController : ControllerBase
     }
 
     [HttpGet("albums/{slug}")]
+    [OutputCache(PolicyName = "Public60s")]
     public async Task<IActionResult> GetAlbum(string slug, CancellationToken cancellationToken)
     {
         var album = await _photographyQueryService.GetAlbumBySlugAsync(slug, cancellationToken);
@@ -47,7 +56,21 @@ public class PhotographyController : ControllerBase
         return Ok(album);
     }
 
+    [HttpGet("albums/{slug}/photos")]
+    [OutputCache(PolicyName = "Public60s")]
+    public async Task<IActionResult> GetAlbumPhotos(
+        string slug, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var result = await _photographyQueryService.GetAlbumPhotosAsync(slug, page, pageSize, cancellationToken);
+        if (result is null)
+        {
+            return NotFound();
+        }
+        return Ok(result);
+    }
+
     [HttpGet("featured")]
+    [OutputCache(PolicyName = "Public60s")]
     public async Task<IActionResult> GetFeatured([FromQuery] int count, CancellationToken cancellationToken)
     {
         var take = count is > 0 and <= 24 ? count : 6;
@@ -57,10 +80,11 @@ public class PhotographyController : ControllerBase
 
     [HttpGet("photos")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetAllPhotos(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAllPhotos(
+        [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
-        var photos = await _photographyQueryService.GetAllPhotosAsync(cancellationToken);
-        return Ok(photos);
+        var result = await _photographyQueryService.GetAllPhotosAsync(page, pageSize, cancellationToken);
+        return Ok(result);
     }
 
     [HttpPost("upload")]

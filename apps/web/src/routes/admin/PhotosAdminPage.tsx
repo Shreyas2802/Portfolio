@@ -162,38 +162,65 @@ function UploadForm() {
 }
 
 function PhotoList() {
-  const { data: photos, isLoading } = useAdminPhotos()
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useAdminPhotos(page)
   const deleteMutation = useDeletePhoto()
 
   if (isLoading) {
     return <p className="mt-8 text-[var(--color-ink-muted)]">Loading…</p>
   }
 
-  if (!photos || photos.length === 0) {
+  if (!data || data.items.length === 0) {
     return <p className="mt-8 text-[var(--color-ink-muted)]">No photos yet.</p>
   }
 
   return (
-    <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {photos.map((photo) => (
-        <div key={photo.id} className="group relative overflow-hidden rounded-md border border-[var(--color-line)]">
-          <img src={photo.thumbnailUrl} alt={photo.title} className="aspect-square w-full object-cover" />
-          <div className="p-2">
-            <p className="truncate text-sm text-[var(--color-ink)]">{photo.title}</p>
+    <>
+      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {data.items.map((photo) => (
+          <div key={photo.id} className="group relative overflow-hidden rounded-md border border-[var(--color-line)]">
+            <img src={photo.thumbnailUrl} alt={photo.title} className="aspect-square w-full object-cover" />
+            <div className="p-2">
+              <p className="truncate text-sm text-[var(--color-ink)]">{photo.title}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Delete "${photo.title}"? This cannot be undone.`)) {
+                  deleteMutation.mutate(photo.id)
+                }
+              }}
+              className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
+            >
+              Delete
+            </button>
           </div>
+        ))}
+      </div>
+
+      {data.totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-4">
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Delete "${photo.title}"? This cannot be undone.`)) {
-                deleteMutation.mutate(photo.id)
-              }
-            }}
-            className="absolute right-2 top-2 rounded-full bg-black/60 px-3 py-1 text-xs text-white opacity-0 transition-opacity hover:bg-red-600 group-hover:opacity-100"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="data-label rounded-full border border-[var(--color-line)] px-4 py-2 hover:border-[var(--color-brass)] hover:text-[var(--color-brass)] disabled:opacity-40"
           >
-            Delete
+            ← Previous
+          </button>
+          <p className="data-label text-[var(--color-ink-muted)]">
+            Page {data.page} of {data.totalPages}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+            disabled={page >= data.totalPages}
+            className="data-label rounded-full border border-[var(--color-line)] px-4 py-2 hover:border-[var(--color-brass)] hover:text-[var(--color-brass)] disabled:opacity-40"
+          >
+            Next →
           </button>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   )
 }

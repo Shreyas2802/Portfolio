@@ -588,3 +588,95 @@ Backend `dotnet list package --vulnerable --include-transitive`
 couldn't be run in this environment (no .NET SDK in this sandbox,
 same limitation noted since Phase 0) - run it locally and report back
 if anything shows up.
+
+---
+
+## Phase 8 — Performance
+
+**Decision:** Server-enforced pagination (`PaginationLimits.ClampPage`/
+`ClampPageSize`, max 48 per page) on the two collection endpoints that
+can genuinely grow large: album photos and the admin all-photos list.
+`AlbumDetailDto` no longer eagerly includes every photo in the album -
+that's now a separate call.
+**Why:** the spec is explicit that the server must clamp page size
+itself (`?pageSize=999999999` must not work) - a client-supplied
+limit is never trusted. Photos and Albums genuinely grow over time as
+more get uploaded; Categories, Tags, and Projects don't (a handful of
+each, added rarely), so pagination wasn't added there - it would be
+complexity with no real benefit at that scale.
+
+**Decision:** Public gallery uses a "Load more" pattern (fetches pages
+1..N via `useQueries` and flattens them, no manual accumulation state);
+the admin photo list uses numbered Previous/Next pages instead.
+**Why:** different audiences want different things here - a visitor
+browsing photos wants continuous scrolling, not pagination controls;
+an admin managing content benefits from precise page numbers and
+counts. Implementing the gallery's accumulation via `useQueries` +
+derived flatMap (rather than accumulating into local state from an
+effect) was also a direct fix for a real lint error - React's
+`set-state-in-effect` rule correctly flagged the first version, since
+a value that can be derived during render shouldn't be pushed through
+an effect.
+
+**Decision:** Output caching (60s) applied to public, read-only GET
+endpoints only (Photography albums/album/album-photos/featured,
+Projects list/detail) via a single named `Public60s` policy - never
+applied globally, never applied to any admin or write endpoint.
+**Why:** repeat visitors browsing the same gallery/project pages hit
+the cache instead of the database. Deliberately did NOT cache
+`/categories` or `/tags` even though they're public GETs - the admin
+UI's own dropdowns (album/project forms) read from these same
+endpoints, and a newly created category needing up to 60s to appear
+in its own creation form would be a confusing regression for the one
+person actually using it.
+
+**Decision:** Response compression enabled for JSON API responses.
+Static image variants under `/uploads` are explicitly left uncompressed
+by response compression (they're JPEGs already), and instead given a
+year-long `Cache-Control: public, max-age=31536000, immutable` header.
+**Why:** re-compressing an already-compressed JPEG wastes CPU for
+negligible size benefit. The immutable cache header is safe because a
+photo's variant files never change in place - editing or replacing a
+photo always means delete + re-upload into a new slug folder (Phase
+5/6), so the URL for a given file is permanently tied to permanently
+the same bytes.
+
+**Decision:** Composite database indexes added matching the actual
+query shapes used by the application - `(AlbumId, IsPublished,
+DisplayOrder)` and `(IsPublished, DisplayOrder)` on Photo,
+`(IsPublished, DisplayOrder)` on Album, `(IsPublished, IsFeatured,
+DisplayOrder)` on Project, plus `UploadedAtUtc` on Photo for the admin
+listing's sort order.
+**Why:** added by reading the actual `Where`/`OrderBy` clauses in each
+query service rather than guessing - an index only helps if it matches
+how the data is actually filtered and sorted.
+
+**Decision:** The React admin panel (`/admin/*`) is code-split into
+its own lazy-loaded chunk via `React.lazy`/`Suspense`, rather than
+bundled into the main app JS.
+**Why:** the public site and the admin panel are used by completely
+different people - a visitor browsing photography never needs any of
+the admin UI's code. Splitting it out reduced the main bundle from
+~432KB to ~402KB and moved the admin-only code (~30KB across 8 small
+chunks) to load on demand, only for whoever actually navigates to
+`/admin`.
+
+**Already satisfied by earlier decisions (documented here rather than
+re-implemented):**
+- **Responsive images / correctly sized variants:** thumb/medium/large
+  JPEG variants with `srcset`/`sizes` were built in Phase 4/5 -
+  browsers already download only the size they need.
+- **Lazy loading below the fold:** `loading="lazy"` on gallery images
+  was already present from Phase 4.
+- **Modern image format consideration:** JPEG was kept deliberately
+  (see Phase 5's SkiaSharp/MetadataExtractor licensing decision) -
+  adding WebP/AVIF variants on top would be a real, separate feature,
+  not addressed here.
+
+**Not addressed this phase, and why:** Core Web Vitals were not
+separately measured/tuned - this app has no route-level data-heavy
+client rendering bottleneck to optimize (pages are simple, and the
+biggest asset weight is already-optimized images), so a dedicated
+measurement pass wouldn't currently surface anything actionable beyond
+what's already covered above. Worth revisiting once the site has real
+production traffic to measure against (Phase 10).

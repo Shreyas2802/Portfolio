@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Portfolio.Application.Common;
 using Portfolio.Application.Photography;
 using Portfolio.Domain.Entities;
 using Portfolio.Infrastructure.Persistence;
@@ -37,25 +38,58 @@ public class PhotographyQueryService : IPhotographyQueryService
 
     public async Task<AlbumDetailDto?> GetAlbumBySlugAsync(string slug, CancellationToken cancellationToken)
     {
-        var album = await _dbContext.Albums
-            .Include(a => a.Category)
-            .Include(a => a.Photos.OrderBy(p => p.DisplayOrder))
-                .ThenInclude(p => p.Tags)
-            .FirstOrDefaultAsync(a => a.Slug == slug && a.IsPublished, cancellationToken);
+        // Metadata only, deliberately no photos here - photos are
+        // fetched separately via GetAlbumPhotosAsync, paginated. An
+        // earlier version eagerly loaded every photo in the album on
+        // this same call, which doesn't scale once an album holds
+        // hundreds of photos (see spec's Gallery Performance section).
+        return await _dbContext.Albums
+            .Where(a => a.Slug == slug && a.IsPublished)
+            .Select(a => new AlbumDetailDto
+            {
+                Id = a.Id,
+                Title = a.Title,
+                Slug = a.Slug,
+                Description = a.Description,
+                CategoryName = a.Category != null ? a.Category.Name : null,
+                PhotoCount = a.Photos.Count(p => p.IsPublished),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 
-        if (album is null)
+    public async Task<PagedResult<PhotoDto>?> GetAlbumPhotosAsync(
+        string albumSlug, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var albumId = await _dbContext.Albums
+            .Where(a => a.Slug == albumSlug && a.IsPublished)
+            .Select(a => (int?)a.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (albumId is null)
         {
             return null;
         }
 
-        return new AlbumDetailDto
+        page = PaginationLimits.ClampPage(page);
+        pageSize = PaginationLimits.ClampPageSize(pageSize);
+
+        var query = _dbContext.Photos
+            .Include(p => p.Tags)
+            .Where(p => p.AlbumId == albumId && p.IsPublished)
+            .OrderBy(p => p.DisplayOrder);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var photos = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<PhotoDto>
         {
-            Id = album.Id,
-            Title = album.Title,
-            Slug = album.Slug,
-            Description = album.Description,
-            CategoryName = album.Category?.Name,
-            Photos = album.Photos.Where(p => p.IsPublished).Select(ToDto).ToList(),
+            Items = photos.Select(ToDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
         };
     }
 
@@ -71,14 +105,28 @@ public class PhotographyQueryService : IPhotographyQueryService
         return photos.Select(ToDto).ToList();
     }
 
-    public async Task<List<PhotoDto>> GetAllPhotosAsync(CancellationToken cancellationToken)
+    public async Task<PagedResult<PhotoDto>> GetAllPhotosAsync(int page, int pageSize, CancellationToken cancellationToken)
     {
-        var photos = await _dbContext.Photos
+        page = PaginationLimits.ClampPage(page);
+        pageSize = PaginationLimits.ClampPageSize(pageSize);
+
+        var query = _dbContext.Photos
             .Include(p => p.Tags)
-            .OrderByDescending(p => p.UploadedAtUtc)
+            .OrderByDescending(p => p.UploadedAtUtc);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var photos = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return photos.Select(ToDto).ToList();
+        return new PagedResult<PhotoDto>
+        {
+            Items = photos.Select(ToDto).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+        };
     }
 
     private static PhotoDto ToDto(Photo p) => new()

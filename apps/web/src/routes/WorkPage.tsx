@@ -1,23 +1,24 @@
 import { useState } from 'react'
 import { DataLabel } from '../components/ui/DataLabel'
 import { Lightbox } from '../components/ui/Lightbox'
-import { useAlbums, useAlbum } from '../features/photography/usePhotography'
+import { useAlbums, useAlbum, useAlbumPhotos } from '../features/photography/usePhotography'
 
 /**
- * Gallery page. Shows every published album as a set of tabs, not
- * just the first one - an earlier version only ever fetched
- * albums[0], so a second (or third...) published album was invisible
- * here even though it existed and had photos. Selecting a tab loads
- * that album's photos.
+ * Gallery page. Shows every published album as a set of tabs, and
+ * loads that album's photos a page at a time (Phase 8) rather than
+ * all at once - the earlier version fetched every photo in the album
+ * in a single request, which doesn't scale once an album holds
+ * hundreds of photos.
  */
 export function WorkPage() {
   const { data: albums, isLoading: albumsLoading } = useAlbums()
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
   const activeSlug = selectedSlug ?? albums?.[0]?.slug
   const { data: album, isLoading: albumLoading } = useAlbum(activeSlug)
+  const { photos, isLoading: photosLoading, isLoadingMore, hasMore, loadMore } = useAlbumPhotos(activeSlug)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
-  const isLoading = albumsLoading || (Boolean(activeSlug) && albumLoading)
+  const isLoading = albumsLoading || (Boolean(activeSlug) && (albumLoading || photosLoading))
 
   return (
     <section className="mx-auto max-w-[1600px] px-6 py-24 sm:px-10">
@@ -61,7 +62,7 @@ export function WorkPage() {
           <p className="mt-4 max-w-2xl text-[var(--color-ink-muted)]">{album.description}</p>
 
           <div className="mt-12 columns-1 gap-1 sm:columns-2 lg:columns-3 [&>*]:mb-1">
-            {album.photos.map((photo, index) => (
+            {photos.map((photo, index) => (
               <button
                 key={photo.id}
                 type="button"
@@ -80,12 +81,25 @@ export function WorkPage() {
               </button>
             ))}
           </div>
+
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="data-label rounded-full border border-[var(--color-line)] px-6 py-3 hover:border-[var(--color-brass)] hover:text-[var(--color-brass)] disabled:opacity-50"
+              >
+                {isLoadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
         </>
       )}
 
       {album && activeIndex !== null && (
         <Lightbox
-          photos={album.photos}
+          photos={photos}
           activeIndex={activeIndex}
           onClose={() => setActiveIndex(null)}
           onNavigate={setActiveIndex}

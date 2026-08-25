@@ -1,12 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiAuthDelete, apiAuthGet, apiAuthPostForm } from '../../lib/api'
-import type { Photo } from '../photography/types'
+import type { PagedResult, Photo } from '../photography/types'
 import type { AlbumAdmin } from './useAdminAlbums'
 
-export function useAdminPhotos() {
+export const ADMIN_PAGE_SIZE = 24
+
+/**
+ * Paged, not a flat list (Phase 8) - matches the paginated
+ * /photography/photos endpoint. Uses Previous/Next rather than the
+ * public gallery's "Load more": an admin management list benefits
+ * from precise page numbers and counts more than continuous
+ * scrolling does.
+ */
+export function useAdminPhotos(page: number) {
   return useQuery({
-    queryKey: ['admin-photos'],
-    queryFn: () => apiAuthGet<Photo[]>('/photography/photos'),
+    queryKey: ['admin-photos', page],
+    queryFn: () =>
+      apiAuthGet<PagedResult<Photo>>(`/photography/photos?page=${page}&pageSize=${ADMIN_PAGE_SIZE}`),
   })
 }
 

@@ -140,6 +140,24 @@ builder.Services.AddScoped<IProjectManagementService, ProjectManagementService>(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 
+// Compress JSON API responses - the spec's "Compress HTTP responses"
+// bullet. Static image variants under /uploads are already compressed
+// (JPEG) and explicitly excluded below - re-compressing already-
+// compressed binary data wastes CPU for no size benefit.
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
+// Named output-cache policy applied per-endpoint via [OutputCache] on
+// public read-only GETs. A separate, unnamed default policy is left
+// alone (not applied globally) so nothing is cached unless explicitly
+// opted in - admin endpoints and all writes must never be cached.
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy("Public60s", policy => policy.Expire(TimeSpan.FromSeconds(60)));
+});
+
 // Structured error handling: unhandled exceptions become a standard
 // RFC 7807 ProblemDetails JSON response instead of leaking a stack
 // trace to the client. This is on from day one rather than bolted on
@@ -184,9 +202,24 @@ using (var identitySeedScope = app.Services.CreateScope())
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+
+// Long-lived, immutable caching for uploaded image variants - a given
+// photo's thumb/medium/large.jpg never changes in place (delete +
+// re-upload always creates a new slug folder, see Phase 5/6), so the
+// browser can cache these indefinitely instead of re-checking every
+// visit.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+    },
+});
+
 app.UseCors(DevClientCorsPolicy);
 app.UseRateLimiter();
+app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

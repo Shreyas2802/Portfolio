@@ -66,6 +66,7 @@ public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(c => c.Albums)
                 .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => new { e.IsPublished, e.DisplayOrder });
         });
 
         modelBuilder.Entity<Photo>(entity =>
@@ -89,6 +90,17 @@ public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
             entity.HasMany(e => e.Tags)
                 .WithMany(t => t.Photos)
                 .UsingEntity(j => j.ToTable("PhotoTags"));
+
+            // Composite indexes matching the actual query shapes (Phase 8):
+            // - album gallery pages filter by AlbumId + IsPublished, order
+            //   by DisplayOrder (GetAlbumPhotosAsync)
+            // - the featured/homepage query filters IsPublished, orders by
+            //   DisplayOrder (GetFeaturedPhotosAsync)
+            // - the admin photo list orders by UploadedAtUtc across all
+            //   photos regardless of album (GetAllPhotosAsync)
+            entity.HasIndex(e => new { e.AlbumId, e.IsPublished, e.DisplayOrder });
+            entity.HasIndex(e => new { e.IsPublished, e.DisplayOrder });
+            entity.HasIndex(e => e.UploadedAtUtc);
         });
 
         modelBuilder.Entity<Tag>(entity =>
@@ -112,6 +124,7 @@ public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.LiveUrl).HasMaxLength(500);
             entity.Property(e => e.CoverImageUrl).HasMaxLength(500);
             entity.HasIndex(e => e.Slug).IsUnique();
+            entity.HasIndex(e => new { e.IsPublished, e.IsFeatured, e.DisplayOrder });
         });
     }
 }

@@ -35,5 +35,13 @@ export interface AlbumDetail {
   slug: string
   description: string
   categoryName: string | null
-  photos: Photo[]
+  photoCount: number
+}
+
+export interface PagedResult<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
 }

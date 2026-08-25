@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Portfolio.Application.Projects;
 using Portfolio.Application.Validation;
 
@@ -21,6 +22,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet]
+    [OutputCache(PolicyName = "Public60s")]
     public async Task<IActionResult> GetPublished(CancellationToken cancellationToken)
     {
         var projects = await _projectQueryService.GetPublishedAsync(cancellationToken);
@@ -28,6 +30,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet("{slug}")]
+    [OutputCache(PolicyName = "Public60s")]
     public async Task<IActionResult> GetBySlug(string slug, CancellationToken cancellationToken)
     {
         var project = await _projectQueryService.GetBySlugAsync(slug, cancellationToken);

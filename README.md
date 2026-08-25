@@ -165,6 +165,21 @@ since that's served by Vite's dev server (a different process/port)
 in local development - see the architecture decision log for why, and
 what Phase 10 needs to do about it.
 
+Phase 8 (Performance) adds two new database indexes on existing
+tables and changes the shape of a couple of endpoints - no new
+entities, but you do need a migration for the indexes:
+```bash
+dotnet ef migrations add AddPerformanceIndexes --project Portfolio.Infrastructure --startup-project Portfolio.Api
+dotnet ef database update --project Portfolio.Infrastructure --startup-project Portfolio.Api
+```
+The public gallery (`/work`) now loads photos a page at a time with a
+"Load more" button instead of all at once; `/admin/photos` gained
+Previous/Next page controls. The admin panel's JavaScript is now a
+separate chunk that only downloads when someone actually visits
+`/admin/*` - check this by opening the Network tab on the public site
+and confirming no `AdminLayout`/`PhotosAdminPage`/etc. chunks load
+until you navigate there.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and
