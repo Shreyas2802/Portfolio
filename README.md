@@ -180,6 +180,60 @@ separate chunk that only downloads when someone actually visits
 and confirming no `AdminLayout`/`PhotosAdminPage`/etc. chunks load
 until you navigate there.
 
+## Testing (Phase 9)
+
+**Unit tests** (`apps/api/Portfolio.Tests.Unit`) - pure logic, no
+database or network needed:
+```bash
+cd apps/api
+dotnet test Portfolio.Tests.Unit
+```
+
+**Integration tests** (`tests/api-integration/Portfolio.Tests.Integration`) -
+boots the real app against an in-memory SQLite database, no SQL
+Server/LocalDB required:
+```bash
+dotnet test ../tests/api-integration/Portfolio.Tests.Integration
+```
+Or from the solution root (`apps/api`), `dotnet test` runs both test
+projects together alongside a full solution build.
+
+**End-to-end tests** (`tests/web-e2e`, Playwright) - needs both dev
+servers actually running first. See `tests/web-e2e/README.md` for
+full setup; short version:
+```bash
+cd tests/web-e2e
+npm install
+npx playwright install chromium
+npm test
+```
+Admin-flow E2E tests are skipped unless you pass
+`E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD` matching your local
+`AdminUser` secrets.
+
+**Security checklist:** see
+[`docs/security/pre-production-checklist.md`](docs/security/pre-production-checklist.md)
+before deploying - it's filled in with this codebase's actual current
+status per item, not a blank template.
+
+## Deployment (Phase 10)
+
+Full runbook: [`docs/deployment/plesk-deployment-guide.md`](docs/deployment/plesk-deployment-guide.md).
+
+Quick version:
+```powershell
+.\deploy\build-and-publish.ps1
+```
+builds the frontend, copies it into the API's `wwwroot` (never
+touching `wwwroot\uploads`), and publishes the backend to `.\publish` -
+that folder is what gets uploaded to Plesk. The guide covers
+environment variables/secrets, the production database, keeping
+uploaded photos safe across redeploys, HTTPS, monitoring, backups, and
+CI/CD in full.
+
+CI (build + test on every push) is already configured in
+`.github/workflows/ci.yml` and needs no setup - it just runs on GitHub.
+
 With both running, open http://localhost:5173 — the page should show
 a green "API status: ok" line. If it's red, the API isn't running or
 isn't reachable on port 5199 (check `apps/web/vite.config.ts` and

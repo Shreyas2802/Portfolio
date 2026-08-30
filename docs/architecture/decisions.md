@@ -680,3 +680,154 @@ biggest asset weight is already-optimized images), so a dedicated
 measurement pass wouldn't currently surface anything actionable beyond
 what's already covered above. Worth revisiting once the site has real
 production traffic to measure against (Phase 10).
+
+---
+
+## Phase 9 — Testing
+
+**Decision:** Unit tests target the pure, already-isolated business
+logic that existed before this phase (`SlugHelper`, `SafeUrlValidator`,
+`PaginationLimits`) rather than trying to unit-test things that
+inherently need real infrastructure (EF Core queries, EXIF extraction
+from real image bytes, JWT issuance).
+**Why:** matches the spec's own examples exactly ("slug generation,
+validation, business rules") - and testing infrastructure-heavy code
+with mocks tends to verify the mocks, not the actual behavior; that's
+what the integration tests are for instead.
+
+**Decision:** Integration tests use a real `WebApplicationFactory<Program>`
+booting the actual app (real middleware, real controllers) against an
+in-memory SQLite database, under a distinct `"Testing"` environment
+name - not `"Development"`.
+**Why:** SQLite in-memory gives real relational behavior (unique
+constraints, foreign keys) without needing a SQL Server/LocalDB
+instance available in CI or on another machine. Using a separate
+environment name (rather than `Development`) specifically skips the
+dev-only `DbSeeder`/`ProjectSeeder` calls, so every test seeds exactly
+its own fixture data - deterministic, not dependent on the shape of
+whatever the dev seed happens to contain this week.
+
+**Fix, found while building this:** two real `WebApplicationFactory`
+gotchas were caught before they caused flaky tests, not after:
+- `UseRateLimiter()` partitions by IP - but `WebApplicationFactory`'s
+  in-memory test server typically reports a null `RemoteIpAddress`,
+  meaning every request across every test in a class could collide
+  into one shared rate-limit bucket and spuriously return 429 for
+  reasons having nothing to do with what the test actually checks.
+- `UseHttpsRedirection()` issues a redirect when `Request.IsHttps` is
+  false - and `WebApplicationFactory`'s default test client is plain
+  HTTP, so every expected 200/401/404 would silently become a 307
+  instead.
+Both middlewares are skipped specifically when
+`app.Environment.IsEnvironment("Testing")` - real rate limiting and
+HTTPS redirection are already manually verified working in
+Development/Production (Phase 7), so skipping them in the isolated
+test environment doesn't leave either behavior actually unverified.
+
+**Decision:** `docs/security/pre-production-checklist.md` mirrors the
+spec's Security Testing Checklist line by line, with each item
+annotated with its real current status in this codebase - not a blank
+template to fill in later.
+**Why:** most items on that list aren't unit-testable assertions
+(e.g. "HTTPS enforced," "backup tested") - they're deployment/
+operational facts. A checklist that's actually filled in with honest
+current state is more useful than pretending they're all automatable,
+and it makes exactly what Phase 10 still needs to close out visible
+at a glance.
+
+**Decision:** E2E tests (Playwright) run against real, already-running
+dev servers rather than spinning up their own - and the admin test
+suite is skipped entirely (not faked, not hardcoded credentials)
+unless `E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD` env vars are set.
+**Why:** this is a single-environment personal project, not a service
+with a dedicated CI test environment - matching that scale is more
+honest than building CI infrastructure this project doesn't need yet.
+Never hardcoding real admin credentials into a test file (even a
+gitignored one) avoids the classic mistake of a "temporary" test
+credential ending up committed by accident later.
+
+**Decision:** The spec's E2E list includes "admin edits photo
+metadata" and "admin publishes photo" - neither is implemented as a
+real test, because neither capability exists yet: there's no photo-
+edit screen (only upload and delete), and upload always publishes
+immediately (no draft state for photos specifically, unlike Albums/
+Projects which do have a publish toggle).
+**Why:** writing a test for a feature that doesn't exist would mean
+either skipping it silently (hiding the gap) or faking a pass - both
+worse than stating the gap directly, here and in the test file itself.
+
+---
+
+## Phase 10 — Deployment
+
+**Decision:** Production serves the built React SPA from the same
+ASP.NET Core app as the API (`wwwroot` + `MapFallbackToFile`), rather
+than hosting the frontend separately.
+**Why:** the spec explicitly prefers same-origin hosting when
+possible ("reduces CORS complexity"). It also closes a gap flagged
+back in Phase 7: the security headers middleware previously only
+covered API responses because Vite served the SPA's HTML separately
+in dev - in production, the same middleware now covers the actual
+page users load, not just the JSON underneath it. Verified the CSP
+(`script-src 'self'; style-src 'self'`) is compatible by inspecting
+the real Vite production build output - no inline scripts or styles,
+just external `<script src>`/`<link href>` tags - so nothing needed
+loosening.
+
+**Decision:** Uploads storage location is configurable
+(`Storage:UploadsRootPath`, defaulting to the unchanged
+`wwwroot/uploads` dev behavior when unset) and served via its own
+explicit static-file mapping rather than folding into the general
+`wwwroot` static files.
+**Why:** `dotnet publish` and most deployment methods replace an app's
+published folder wholesale - if uploaded photos lived inside it,
+every redeploy would silently delete every photo anyone ever uploaded.
+Making the path configurable means production can point it outside
+the deployed folder entirely, with zero code changes needed and zero
+migration friction for existing local dev data (the default is
+unchanged).
+
+**Decision:** `ASPNETCORE_ENVIRONMENT=Production` is baked into the
+published `web.config` via an `<EnvironmentVariables>` MSBuild item in
+`Portfolio.Api.csproj` (safe to commit - not a secret). Every other
+production value (connection string, JWT key, admin credentials,
+uploads path) is set via Plesk's own environment-variable
+configuration, never committed.
+**Why:** this is the same secrets-never-committed principle used
+throughout (User Secrets locally, since Phase 5's `AdminUploadKey`) -
+just applied at the hosting layer instead of the dev-machine layer.
+Baking in the one genuinely non-secret value means it survives every
+republish automatically instead of needing to be reset by hand each
+time.
+
+**Decision:** Monitoring uses IIS/ANCM's built-in stdout logging
+(a `web.config` setting) plus the existing Phase 2 `/api/health`
+endpoint for uptime checks - no new logging library or APM dependency
+was added.
+**Why:** matches this project's consistent "minimal necessary
+dependencies" pattern (see the ImageSharp/SkiaSharp decision in Phase
+5). A personal-scale site doesn't need a dedicated logging service;
+a file next to the deployed app and a health endpoint that already
+reports real database connectivity (not just "the process is up") is
+proportionate to the actual scale here.
+
+**Decision:** CI (GitHub Actions: build, unit tests, integration
+tests, lint, dependency audits) is fully set up and automatic on every
+push. CD (actual deployment to Plesk) is deliberately left as a
+documented manual/Plesk-Git-driven process, not a fully automated
+pipeline.
+**Why:** CI needs no credentials beyond what GitHub already provides
+and is unambiguously safe to automate. Fully automated push-to-deploy
+would need real Plesk server credentials stored as repository secrets
+- setting that up without being able to verify it against the actual
+live server would mean shipping deployment automation that's never
+been tested, which is worse than clear manual instructions that have
+been reasoned through carefully instead.
+
+**Honest limitation:** none of this phase's deployment steps have
+been executed against the real Plesk environment - I don't have
+access to it. The guide is a carefully-reasoned runbook, not a
+verified one; the same "please run this and report back" caveat that
+applied to every .NET change since Phase 0 (no .NET SDK in this
+sandbox) applies even more strongly here, since deployment also
+depends on Plesk-specific configuration I can't see or test against.

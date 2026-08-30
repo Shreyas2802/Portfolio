@@ -28,4 +28,17 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
   </ItemGroup>
 
+  <!--
+    Baked into the generated web.config's <aspNetCore><environmentVariables>
+    section on every `dotnet publish` - survives republishing without any
+    manual post-publish editing. Only the environment NAME goes here
+    (never a secret) - the actual connection string, JWT key, and admin
+    credentials are set via Plesk's own environment-variable
+    configuration for the site, never committed to this file. See
+    docs/deployment/plesk-deployment-guide.md.
+  -->
+  <ItemGroup>
+    <EnvironmentVariables Include="ASPNETCORE_ENVIRONMENT" Value="Production" />
+  </ItemGroup>
+
 </Project>

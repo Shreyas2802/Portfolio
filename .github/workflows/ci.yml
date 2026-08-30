@@ -1,0 +1,75 @@
+name: CI
+
+# Runs on every push and PR - build + test both the backend and
+# frontend, plus a dependency vulnerability check for each. This is
+# CI only (build/test verification), not CD - actual deployment to
+# Plesk is a separate, manual step (see
+# docs/deployment/plesk-deployment-guide.md) since it needs real
+# server credentials this workflow doesn't have.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Unit tests
+        run: dotnet test Portfolio.Tests.Unit --no-build --configuration Release
+
+      - name: Integration tests
+        run: dotnet test ../../tests/api-integration/Portfolio.Tests.Integration --configuration Release
+
+      - name: Dependency vulnerability check
+        # Doesn't fail the build - informational, matching this
+        # project's existing manual-audit practice (Phase 7/9). Change
+        # to `run: dotnet list package --vulnerable --include-transitive
+        # | grep -q "has the following vulnerable packages" && exit 1
+        # || exit 0` if you want this to actually fail CI on findings.
+        run: dotnet list package --vulnerable --include-transitive
+        continue-on-error: true
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency vulnerability check
+        run: npm audit --audit-level=high

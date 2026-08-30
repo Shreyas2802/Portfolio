@@ -39,15 +39,16 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(DevClientCorsPolicy, policy =>
     {
-        // Only the Vite dev origin - never AllowAnyOrigin(). No
-        // AllowCredentials() either: auth is a JWT sent via the
-        // Authorization header, not a cookie, so credentialed CORS
-        // (the specifically dangerous combination the spec calls out)
-        // doesn't apply here at all. Phase 10 (Deployment) adds the
-        // real production frontend origin to this list - or removes
-        // the need for CORS entirely if frontend and API end up
-        // served from the same origin, which the spec prefers.
-        policy.WithOrigins("http://localhost:5173")
+        // No AllowAnyOrigin(), no AllowCredentials() (auth is a JWT via
+        // the Authorization header, not a cookie, so the credentialed-
+        // CORS combination the spec warns against doesn't apply here).
+        // Both origins point at the SAME app in production once the
+        // built SPA is served from this same API (see MapFallbackToFile
+        // below) - the production origin is kept in the list anyway as
+        // a harmless safety net in case that ever changes, and the dev
+        // origin is required since local dev genuinely is cross-origin
+        // (Vite on 5173, API on 5199).
+        policy.WithOrigins("http://localhost:5173", "https://portfolio.vistrut.com")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -140,6 +141,11 @@ builder.Services.AddScoped<IProjectManagementService, ProjectManagementService>(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 
+// Storage:UploadsRootPath is optional - unset means "use wwwroot/uploads"
+// (unchanged dev behavior). In production this should point outside the
+// deployed app's publish folder - see the deployment guide.
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+
 // Compress JSON API responses - the spec's "Compress HTTP responses"
 // bullet. Static image variants under /uploads are already compressed
 // (JPEG) and explicitly excluded below - re-compressing already-
@@ -201,16 +207,45 @@ using (var identitySeedScope = app.Services.CreateScope())
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
-app.UseHttpsRedirection();
+
+// Also skipped in Testing - see the UseRateLimiter comment below for
+// the general reasoning. This one specifically avoids a well-known
+// WebApplicationFactory gotcha: its in-memory test client defaults to
+// plain HTTP, and UseHttpsRedirection() would silently turn every
+// test's expected response into a 307 redirect instead of the actual
+// controller response, breaking assertions for reasons that have
+// nothing to do with what each test is checking.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseResponseCompression();
 
-// Long-lived, immutable caching for uploaded image variants - a given
+// Serves the built React SPA (index.html, /assets/*) once it's copied
+// into wwwroot as part of the production build (see the deployment
+// guide) - in local dev, wwwroot has no SPA build in it (Vite serves
+// the SPA itself on a different port), so this simply has nothing to
+// serve there and is harmless.
+app.UseStaticFiles();
+
+// Uploaded photo variants are served separately, from whatever path
+// Storage:UploadsRootPath resolves to (defaults to wwwroot/uploads,
+// see StorageOptions) - kept as its own mapping, rather than relying
+// on the wwwroot mapping above, specifically so production can point
+// this at a folder OUTSIDE the app's publish directory without any
+// other code needing to change. Long-lived, immutable caching: a
 // photo's thumb/medium/large.jpg never changes in place (delete +
-// re-upload always creates a new slug folder, see Phase 5/6), so the
-// browser can cache these indefinitely instead of re-checking every
-// visit.
+// re-upload always creates a new slug folder, see Phase 5/6).
+var uploadsRootPath = builder.Configuration["Storage:UploadsRootPath"];
+var resolvedUploadsPath = string.IsNullOrWhiteSpace(uploadsRootPath)
+    ? Path.Combine(app.Environment.ContentRootPath, "wwwroot", "uploads")
+    : uploadsRootPath;
+Directory.CreateDirectory(resolvedUploadsPath);
 app.UseStaticFiles(new StaticFileOptions
 {
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(resolvedUploadsPath),
+    RequestPath = "/uploads",
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
@@ -218,10 +253,38 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseCors(DevClientCorsPolicy);
-app.UseRateLimiter();
+
+// Skipped specifically in the "Testing" environment (integration
+// tests use WebApplicationFactory, which shares one app/DI instance -
+// and therefore one rate-limiter state - across every request a test
+// class makes). Rate limiting itself is already manually verified
+// working in Phase 7; this avoids unrelated integration tests
+// spuriously hitting 429 because they share a rate-limit bucket with
+// sibling tests in the same class, not because of anything the test
+// is actually asserting.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 app.UseOutputCache();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+// Falls back to the SPA's index.html for any request that didn't match
+// a controller route or an existing static file - this is what makes
+// client-side routing (React Router) work when someone loads
+// /projects or /admin/photos directly rather than navigating there
+// from the homepage. Only meaningful once wwwroot actually contains a
+// built SPA (production, per the deployment guide) - in local dev
+// nothing ever hits this API on the root path (Vite handles that on
+// its own port), so this has no effect there.
+app.MapFallbackToFile("index.html");
+
 app.Run();
+
+// Top-level statements generate an internal Program class by default -
+// WebApplicationFactory<Program> (used by integration tests) needs it
+// to be at least as visible as the test project can see. This doesn't
+// change any runtime behavior.
+public partial class Program { }

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    No TreatWarningsAsErrors here, unlike the main projects - test
+    code has different conventions (e.g. xUnit's [Theory] data
+    generators sometimes trip nullable warnings that aren't worth
+    fighting for test-only code).
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Portfolio.Application\Portfolio.Application.csproj" />
+    <ProjectReference Include="..\Portfolio.Infrastructure\Portfolio.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

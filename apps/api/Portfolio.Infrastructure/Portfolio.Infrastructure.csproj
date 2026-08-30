@@ -24,6 +24,12 @@
     <PackageReference Include="MetadataExtractor" Version="2.8.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Lets Portfolio.Tests.Unit reference internal types (e.g. SlugHelper)
+         directly, rather than making them public just for testability. -->
+    <InternalsVisibleTo Include="Portfolio.Tests.Unit" />
+  </ItemGroup>
+
   <!--
     ASP.NET Core Identity arrives in Phase 6. SkiaSharp (MIT) handles
     decode/resize/encode and MetadataExtractor (Apache 2.0) handles
