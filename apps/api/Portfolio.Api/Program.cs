@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Portfolio.Api.Middleware;
 using Portfolio.Application.Admin;
@@ -146,7 +148,22 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IContactMessageService, ContactMessageService>();
 builder.Services.AddScoped<IPhotographyQueryService, PhotographyQueryService>();
-builder.Services.AddScoped<IPhotoStorageService, LocalPhotoStorageService>();
+// Photo storage: Storage:Provider picks Local (default) or AzureBlob.
+// Resolved per request from IOptions, not read into a variable here -
+// the same lesson as the JWT settings above.
+builder.Services.AddScoped<LocalPhotoStorageService>();
+builder.Services.AddSingleton(sp =>
+{
+    var blobOptions = sp.GetRequiredService<IOptions<StorageOptions>>().Value.AzureBlob;
+    return new BlobServiceClient(blobOptions.ConnectionString
+        ?? throw new InvalidOperationException("Storage:AzureBlob:ConnectionString is not set."));
+});
+builder.Services.AddSingleton(sp => sp.GetRequiredService<BlobServiceClient>()
+    .GetBlobContainerClient(sp.GetRequiredService<IOptions<StorageOptions>>().Value.AzureBlob.ContainerName));
+builder.Services.AddScoped<IPhotoStorageService>(sp =>
+    sp.GetRequiredService<IOptions<StorageOptions>>().Value.Provider == StorageProvider.AzureBlob
+        ? ActivatorUtilities.CreateInstance<AzureBlobPhotoStorageService>(sp)
+        : sp.GetRequiredService<LocalPhotoStorageService>());
 builder.Services.AddScoped<IPhotoUploadService, PhotoUploadService>();
 builder.Services.AddScoped<IAlbumManagementService, AlbumManagementService>();
 builder.Services.AddScoped<ICategoryManagementService, CategoryManagementService>();
@@ -221,6 +238,18 @@ using (var identitySeedScope = app.Services.CreateScope())
     var roleManager = identitySeedScope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var logger = identitySeedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await IdentitySeeder.SeedAsync(userManager, roleManager, builder.Configuration, logger);
+}
+
+// Blob storage startup: fail fast on missing settings, create the
+// container and apply CORS. Skipped entirely for the Local provider.
+var storageOptions = app.Services.GetRequiredService<IOptions<StorageOptions>>().Value;
+if (storageOptions.Provider == StorageProvider.AzureBlob)
+{
+    AzureBlobStorageInitializer.Validate(storageOptions.AzureBlob);
+    await AzureBlobStorageInitializer.InitializeAsync(
+        app.Services.GetRequiredService<BlobServiceClient>(),
+        storageOptions.AzureBlob,
+        app.Services.GetRequiredService<ILogger<Program>>());
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();

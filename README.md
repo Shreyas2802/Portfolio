@@ -29,7 +29,7 @@ and running in production on a Windows/IIS (Plesk) host.
 - EXIF orientation is applied to the pixels, so portrait photos never appear sideways
 - Three resized versions (480 / 1200 / 2400 px) generated with SkiaSharp
 - Optional text watermark on the medium and large versions
-- Storage behind an `IPhotoStorageService` interface, with a configurable root outside the deploy folder
+- Pluggable storage behind `IPhotoStorageService`: **local disk** or **Azure Blob Storage**, switched by one setting ([details](docs/storage/azure-blob-storage.md)). Existing photos keep working after a switch, and the Blob path is tested in CI against Azurite
 
 **Security & performance**
 - ASP.NET Core Identity + JWT bearer auth, 12-character passwords, account lockout
@@ -48,7 +48,7 @@ apps/
   api/
     Portfolio.Domain          Entities (Photo, Album, Category, Tag, Project, ContactMessage, SiteSettings)
     Portfolio.Application     DTOs, request models, service interfaces, validation
-    Portfolio.Infrastructure  EF Core DbContext + migrations, Identity, image processing, storage
+    Portfolio.Infrastructure  EF Core DbContext + migrations, Identity, image processing, local + Azure Blob storage
     Portfolio.Api             Controllers, middleware, DI and the HTTP pipeline (Program.cs)
     Portfolio.Tests.Unit      xUnit unit tests
   web/                        React 19 + TypeScript + Vite + Tailwind CSS 4 + TanStack Query
@@ -72,6 +72,8 @@ More detail: [`docs/architecture/overview.md`](docs/architecture/overview.md) ·
 ### Known trade-offs
 - The admin JWT is kept in `localStorage`. That's acceptable for a single-admin
   site with a strict CSP, but an HttpOnly cookie would be safer against XSS.
+- With Azure Blob storage, photos are served from a public container. Fine for a
+  public gallery; private photos would need short-lived SAS URLs instead.
 - Image versions are generated during the upload request. A background queue
   would make large uploads return faster.
 - The SPA is rendered in the browser. Social previews use static meta tags, and
@@ -81,7 +83,7 @@ More detail: [`docs/architecture/overview.md`](docs/architecture/overview.md) ·
 
 ## Running locally
 
-**Prerequisites:** .NET SDK 9, Node.js 20+, SQL Server LocalDB (ships with Visual Studio)
+**Prerequisites:** .NET SDK 9, Node.js 22+, SQL Server LocalDB (ships with Visual Studio)
 
 ```bash
 # 1. Secrets (stored outside the repo via .NET User Secrets)
@@ -104,7 +106,9 @@ npm install
 npm run dev
 ```
 
-In Development the API seeds sample photos and projects on first run. Sign in at
+In Development the API seeds sample photos and projects on first run. Photos are
+stored on local disk by default; to use Azure Blob Storage locally via the Azurite
+emulator, see [docs/storage/azure-blob-storage.md](docs/storage/azure-blob-storage.md). Sign in at
 `/admin/login` with the admin credentials you set above.
 
 ## Tests
@@ -132,7 +136,7 @@ is in `apps/api/Portfolio.Api/web.config.example`; the real file is never commit
 The full runbook is in [`docs/deployment/plesk-deployment-guide.md`](docs/deployment/plesk-deployment-guide.md).
 
 ## Roadmap
-- [ ] Move photo storage to Azure Blob Storage (behind the existing `IPhotoStorageService`)
+- [x] Azure Blob Storage provider for photos (behind the existing `IPhotoStorageService`)
 - [ ] Generate image versions in a background queue
 - [ ] Docker Compose for one-command local setup
 - [ ] Structured logging with Serilog + Application Insights

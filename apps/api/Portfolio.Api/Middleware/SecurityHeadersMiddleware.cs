@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using Portfolio.Infrastructure.Photography;
+
 namespace Portfolio.Api.Middleware;
 
 /// <summary>
@@ -22,11 +25,29 @@ public class SecurityHeadersMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly bool _isDevelopment;
+    private readonly string _imgSrc;
 
-    public SecurityHeadersMiddleware(RequestDelegate next, IHostEnvironment env)
+    public SecurityHeadersMiddleware(RequestDelegate next, IHostEnvironment env, IOptions<StorageOptions> storageOptions)
     {
         _next = next;
         _isDevelopment = env.IsDevelopment();
+        _imgSrc = BuildImgSrc(storageOptions.Value);
+    }
+
+    /// <summary>
+    /// Images normally come from this origin ('self'). With Azure Blob
+    /// storage they come from the storage account / CDN origin instead,
+    /// so that one origin (and only that one) is added to img-src.
+    /// </summary>
+    private static string BuildImgSrc(StorageOptions options)
+    {
+        const string baseImgSrc = "'self' data:";
+        if (options.Provider != StorageProvider.AzureBlob) return baseImgSrc;
+
+        var publicBaseUrl = AzureBlobPhotoStorageService.TryGetPublicBaseUrl(options.AzureBlob);
+        if (publicBaseUrl is null || !Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var uri)) return baseImgSrc;
+
+        return $"{baseImgSrc} {uri.GetLeftPart(UriPartial.Authority)}";
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -39,7 +60,7 @@ public class SecurityHeadersMiddleware
         headers["X-Frame-Options"] = "DENY";
         headers["Content-Security-Policy"] =
             "default-src 'self'; " +
-            "img-src 'self' data:; " +
+            $"img-src {_imgSrc}; " +
             "script-src 'self'; " +
             "style-src 'self'; " +
             "font-src 'self'; " +

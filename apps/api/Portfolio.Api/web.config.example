@@ -23,6 +23,13 @@
           <environmentVariable name="Jwt__Audience" value="PortfolioClient" />
           <environmentVariable name="AdminUser__Username" value="YOUR_ADMIN_USERNAME" />
           <environmentVariable name="AdminUser__Password" value="YOUR_ADMIN_PASSWORD" />
+          <!-- Photo storage: Local (default) or AzureBlob - see docs/storage/azure-blob-storage.md -->
+          <environmentVariable name="Storage__Provider" value="Local" />
+          <!--
+          <environmentVariable name="Storage__AzureBlob__ConnectionString" value="YOUR_STORAGE_CONNECTION_STRING" />
+          <environmentVariable name="Storage__AzureBlob__ContainerName" value="photos" />
+          <environmentVariable name="Storage__AzureBlob__CorsAllowedOrigins__0" value="https://portfolio.vistrut.com" />
+          -->
           <environmentVariable name="Watermark__Enabled" value="true" />
           <environmentVariable name="Watermark__Text" value="© Shreyas Gune" />
         </environmentVariables>

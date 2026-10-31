@@ -42,3 +42,8 @@ artifacts/
 
 # --- Server config with real credentials (use web.config.example) ---
 apps/api/Portfolio.Api/web.config
+
+# --- Azurite (local Azure Storage emulator) ---
+.azurite/
+__azurite_db_*
+__blobstorage__/
