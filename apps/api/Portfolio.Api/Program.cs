@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -108,23 +109,37 @@ builder.Services
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<PortfolioDbContext>();
 
-var jwtKey = builder.Configuration["Jwt:Key"];
+// JWT settings are read when the bearer options are first built, from
+// the app's final IConfiguration - not captured into a local variable
+// here. Reading them eagerly at this point would miss configuration
+// added later in startup (e.g. WebApplicationFactory overrides in the
+// integration tests), leaving an empty key.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IConfiguration>((options, config) =>
     {
+        var jwtKey = config["Jwt:Key"];
+
+        // Fail closed: with no key configured, validate against a random
+        // throwaway key so every token is rejected (401) - instead of
+        // building a zero-length key, which throws and turns every
+        // request into a 500.
+        var signingKeyBytes = string.IsNullOrWhiteSpace(jwtKey)
+            ? RandomNumberGenerator.GetBytes(32)
+            : Encoding.UTF8.GetBytes(jwtKey);
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            // Empty key here is fine at startup (e.g. before user-secrets
-            // are set) - token validation will simply fail closed on
-            // every request rather than throwing at boot.
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey ?? string.Empty)),
+            ValidIssuer = config["Jwt:Issuer"],
+            ValidAudience = config["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(signingKeyBytes),
         };
     });
 builder.Services.AddAuthorization();
