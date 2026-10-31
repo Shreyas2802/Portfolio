@@ -285,6 +285,10 @@ namespace Portfolio.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AccentPalette")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<int>("AlbumId")
                         .HasColumnType("int");
 
@@ -312,6 +316,9 @@ namespace Portfolio.Infrastructure.Migrations
 
                     b.Property<int>("Height")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsHeroPhoto")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
@@ -364,6 +371,8 @@ namespace Portfolio.Infrastructure.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("IsHeroPhoto");
 
                     b.HasIndex("UploadedAtUtc");
 

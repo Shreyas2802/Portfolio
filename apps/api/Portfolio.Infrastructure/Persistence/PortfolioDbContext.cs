@@ -82,6 +82,8 @@ public class PortfolioDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.LensModel).HasMaxLength(200);
             entity.Property(e => e.Aperture).HasColumnType("decimal(4,1)");
             entity.Property(e => e.FocalLengthMm).HasColumnType("decimal(6,1)");
+            entity.Property(e => e.AccentPalette).HasMaxLength(120);
+            entity.HasIndex(e => e.IsHeroPhoto);
             entity.HasIndex(e => e.Slug).IsUnique();
             entity.HasOne(e => e.Album)
                 .WithMany(a => a.Photos)
