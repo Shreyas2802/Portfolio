@@ -208,20 +208,33 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+// --- Database startup ------------------------------------------------
+// Database:MigrateOnStartup (default false) applies pending EF Core
+// migrations at boot - used by docker-compose so a fresh SQL Server
+// container gets its schema without anyone running `dotnet ef`. The
+// Plesk deployment keeps it off and migrates deliberately.
+//
+// Database:SeedSampleData (defaults to true only in Development) loads
+// the sample photos and projects. Kept separate from the environment
+// name so the Docker setup can run as Production (real error handling,
+// no developer exception page) and still show a populated site.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await MigrateWithRetryAsync(app);
+}
+
+if (app.Configuration.GetValue("Database:SeedSampleData", app.Environment.IsDevelopment()))
+{
+    using var seedScope = app.Services.CreateScope();
+    var dbContext = seedScope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+    await DbSeeder.SeedAsync(dbContext);
+    await ProjectSeeder.SeedAsync(dbContext);
+}
+
 // --- Middleware pipeline ---------------------------------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-
-    // Dev-only seed: populates the gallery with real (EXIF-backed)
-    // photo data so Phase 4's UI has something real to render before
-    // the upload pipeline (Phase 5) or admin CMS (Phase 6) exist. No
-    // effect once either of those starts writing real rows - see
-    // DbSeeder for the idempotency check.
-    using var photoSeedScope = app.Services.CreateScope();
-    var dbContext = photoSeedScope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
-    await DbSeeder.SeedAsync(dbContext);
-    await ProjectSeeder.SeedAsync(dbContext);
 }
 else
 {
@@ -328,6 +341,30 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+// SQL Server in a fresh container can accept connections a few seconds
+// before it's ready for DDL, so retry a handful of times before giving up.
+static async Task MigrateWithRetryAsync(WebApplication app)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    const int maxAttempts = 10;
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+            await db.Database.MigrateAsync();
+            logger.LogInformation("Database migrations applied");
+            return;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            logger.LogWarning(ex, "Database not ready (attempt {Attempt}/{Max}), retrying in 3s", attempt, maxAttempts);
+            await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+    }
+}
 
 // Top-level statements generate an internal Program class by default -
 // WebApplicationFactory<Program> (used by integration tests) needs it

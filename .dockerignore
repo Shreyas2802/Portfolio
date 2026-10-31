@@ -1,0 +1,20 @@
+# Keep the build context small and free of secrets.
+.git
+**/node_modules
+**/bin
+**/obj
+**/.vs
+**/test-results
+**/playwright-report
+**/dist
+artifacts
+publish
+.azurite
+
+# The real server web.config holds production credentials. dotnet publish
+# would copy it into the image, so it must never enter the build context.
+apps/api/Portfolio.Api/web.config
+**/*.user
+**/appsettings.*.local.json
+.env
+.env.*

@@ -83,3 +83,68 @@ jobs:
 
       - name: Dependency vulnerability check
         run: npm audit --audit-level=high
+
+  docker:
+    # Builds the production image and runs the full stack (SQL Server,
+    # Azurite, app) exactly as `docker compose up` would on a laptop, then
+    # exercises it end to end: schema migrated, sample data seeded, SPA
+    # served, admin login, and a real photo upload stored in Blob storage.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Wait for the app
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/api/health && exit 0
+            sleep 3
+          done
+          exit 1
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          BASE=http://localhost:8080
+
+          echo "== database connected"
+          curl -fsS $BASE/api/health | grep -q '"database":"connected"'
+
+          echo "== SPA served with security headers"
+          curl -fsS $BASE/ | grep -q '<div id="root">'
+          curl -fsSI $BASE/ | grep -qi '^content-security-policy:.*img-src .*http://localhost:10000'
+
+          echo "== sample data seeded"
+          ALBUM_ID=$(curl -fsS $BASE/api/photography/albums | jq -r '.[0].id')
+          test "$ALBUM_ID" != "null"
+
+          echo "== admin login"
+          TOKEN=$(curl -fsS -X POST $BASE/api/auth/login -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"Local-Admin-2026"}' | jq -r '.token')
+          test -n "$TOKEN" && test "$TOKEN" != "null"
+
+          echo "== upload goes to Azurite"
+          UPLOAD=$(curl -fsS -X POST $BASE/api/photography/upload -H "Authorization: Bearer $TOKEN" \
+            -F "file=@tests/web-e2e/fixtures/test-photo.jpg;type=image/jpeg" \
+            -F "title=CI smoke test" -F "albumId=$ALBUM_ID")
+          echo "$UPLOAD"
+          THUMB=$(echo "$UPLOAD" | jq -r '.thumbnailUrl')
+          case "$THUMB" in http://localhost:10000/devstoreaccount1/photos/*) ;; *) echo "unexpected URL: $THUMB"; exit 1;; esac
+          curl -fsSI "$THUMB" | grep -qi '^content-type: image/jpeg'
+
+          echo "== delete removes the blob"
+          PHOTO_ID=$(echo "$UPLOAD" | jq -r '.id')
+          curl -fsS -X DELETE $BASE/api/photography/$PHOTO_ID -H "Authorization: Bearer $TOKEN" -o /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$THUMB")" = "404"
+
+          echo "All smoke tests passed"
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -81,7 +81,31 @@ More detail: [`docs/architecture/overview.md`](docs/architecture/overview.md) ·
 
 ---
 
-## Running locally
+## Quick start with Docker
+
+The fastest way to run everything (no .NET, Node or SQL Server install needed):
+
+```bash
+docker compose up --build
+```
+
+Then open **http://localhost:8080**. This starts three containers:
+
+| Service | What it is | Port |
+|---|---|---|
+| `app` | The built React site + ASP.NET Core API in one image | 8080 |
+| `sqlserver` | SQL Server 2022 (schema migrated automatically on startup) | 14330 |
+| `azurite` | Azure Storage emulator; new photo uploads are stored here | 10000 |
+
+Sample photos and projects are loaded automatically. Admin login at
+`/admin/login` is `admin` / `Local-Admin-2026` (local demo values only, see
+`docker-compose.yml`). `docker compose down -v` removes everything, including data.
+
+CI runs this same stack on every push and smoke-tests it: database migrated, site
+served with security headers, admin login, and a photo upload that lands in Azurite
+and is deleted again.
+
+## Running locally (without Docker)
 
 **Prerequisites:** .NET SDK 9, Node.js 22+, SQL Server LocalDB (ships with Visual Studio)
 
@@ -124,8 +148,8 @@ npm install && npx playwright install chromium && npm test
 
 The integration tests check authentication, that admin endpoints reject anonymous requests,
 that unpublished content stays hidden from public endpoints, and contact-form
-validation. CI (`.github/workflows/ci.yml`) builds and tests the API and the frontend
-on every push.
+validation. CI (`.github/workflows/ci.yml`) builds and tests the API and the frontend, and
+runs the full Docker stack with an end-to-end smoke test, on every push.
 
 ## Deployment
 
@@ -138,7 +162,7 @@ The full runbook is in [`docs/deployment/plesk-deployment-guide.md`](docs/deploy
 ## Roadmap
 - [x] Azure Blob Storage provider for photos (behind the existing `IPhotoStorageService`)
 - [ ] Generate image versions in a background queue
-- [ ] Docker Compose for one-command local setup
+- [x] Docker Compose for one-command local setup
 - [ ] Structured logging with Serilog + Application Insights
 - [ ] Blog / engineering-notes section in the CMS
 

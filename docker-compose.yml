@@ -1,0 +1,66 @@
+# Local, self-contained copy of the whole site:
+#   docker compose up --build      ->  http://localhost:8080
+#
+# Everything here is for LOCAL USE ONLY. The passwords and keys below are
+# throwaway demo values; the Azurite key is the emulator's public,
+# well-known development key. Never reuse any of them on a real server.
+
+name: portfolio
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "Portfolio_Local_2026!"
+    ports:
+      - "14330:1433"   # connect from SSMS / Azure Data Studio on localhost,14330
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: azurite-blob --blobHost 0.0.0.0 --location /data --skipApiVersionCheck
+    ports:
+      - "10000:10000"
+    volumes:
+      - azuritedata:/data
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    environment:
+      # Production pipeline (real error handling), with demo data turned on.
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=PortfolioDb;User Id=sa;Password=Portfolio_Local_2026!;TrustServerCertificate=True"
+      Database__MigrateOnStartup: "true"
+      Database__SeedSampleData: "true"
+
+      Jwt__Key: "local-docker-only-signing-key-0123456789abcdef"
+      AdminUser__Username: "admin"
+      AdminUser__Password: "Local-Admin-2026"
+
+      # New uploads go to Azurite. The API talks to it as "azurite" inside
+      # the Docker network; browsers load images via localhost:10000.
+      Storage__Provider: AzureBlob
+      Storage__AzureBlob__ConnectionString: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      Storage__AzureBlob__ContainerName: photos
+      Storage__AzureBlob__PublicBaseUrl: "http://localhost:10000/devstoreaccount1/photos"
+      Storage__AzureBlob__CorsAllowedOrigins__0: "http://localhost:8080"
+
+volumes:
+  sqldata:
+  azuritedata:
