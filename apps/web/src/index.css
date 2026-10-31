@@ -6,68 +6,197 @@
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
 
-/*
-  Design tokens — Phase 1.
+/* ── Dark (default) ──────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
 
-  Palette: near-black canvas + warm off-white text + one desaturated
-  brass accent, used sparingly. The site deliberately does NOT commit
-  to a single photographic mood (moody/airy/warm) because the work
-  itself spans genres — the chrome stays neutral and quiet so photos
-  carry the mood, not the UI.
+  --color-canvas:        #0c0b09;
+  --color-canvas-raised: #141210;
+  --color-canvas-hover:  #1c1a16;
 
-  Two type roles:
-  - --font-display: Inter, set with a tight tracking at large sizes,
-    for headings and body copy.
-  - --font-mono: JetBrains Mono, reserved for technical/data labels
-    (camera settings, coordinates, timestamps) — the signature device
-    that ties the "photographer" and "developer" halves of the site
-    together instead of treating them as separate sections.
-*/
-@theme {
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-ink:           #f2ede4;
+  --color-ink-muted:     #96928c;
+  --color-ink-faint:     #56534e;
 
-  --color-canvas: #0b0b0d;
-  --color-canvas-raised: #141416;
-  --color-ink: #f2f0eb;
-  --color-ink-muted: #a3a19c;
-  --color-line: #232326;
-  --color-brass: #b08d57;
-  --color-brass-dim: #8a6f45;
+  --color-line:          #262320;
+  --color-line-strong:   #363330;
+
+  --color-gold:          #c8a550;
+  --color-gold-dim:      #a08040;
+  --color-gold-rgb:      200, 165, 80;
+
+  --color-brass:         #c8a550;
+  --color-brass-dim:     #a08040;
+
+  --hero-scrim-top:    rgba(0,0,0,0.08);
+  --hero-scrim-mid:    rgba(0,0,0,0.38);
+  --hero-scrim-bottom: rgba(0,0,0,0.82);
+  --hero-ink:          #ffffff;
 }
 
-html, body, #root {
-  height: 100%;
+/* ── Light ───────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --color-canvas:        #f5f3ee;
+    --color-canvas-raised: #ffffff;
+    --color-canvas-hover:  #ece9e3;
+
+    --color-ink:           #18160f;
+    --color-ink-muted:     #6a6760;
+    --color-ink-faint:     #a8a59e;
+
+    --color-line:          #dedad4;
+    --color-line-strong:   #c8c4bc;
+
+    --color-gold:          #8c6010;
+    --color-gold-dim:      #6e4c0c;
+    --color-gold-rgb:      140, 96, 16;
+
+    --color-brass:         #8c6010;
+    --color-brass-dim:     #6e4c0c;
+
+    --hero-scrim-top:    rgba(0,0,0,0.04);
+    --hero-scrim-mid:    rgba(0,0,0,0.32);
+    --hero-scrim-bottom: rgba(0,0,0,0.78);
+    --hero-ink:          #ffffff;
+  }
 }
+
+/* ── Base ────────────────────────────────────────────────────────── */
+html, body, #root { height: 100%; }
 
 body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
-  font-family: var(--font-display);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Visible keyboard focus everywhere — never suppressed. */
+@theme {
+  --font-display: "Inter";
+  --font-mono: "JetBrains Mono";
+}
+
+/* ── Focus ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid var(--color-brass);
+  outline: 2px solid var(--color-gold);
   outline-offset: 3px;
   border-radius: 2px;
 }
 
+/* ── Reduced motion ──────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
 }
 
-/* Utility class for the EXIF-style technical labels used throughout. */
+/* ── Data labels (EXIF, captions — NOT page headings) ────────────── */
+/* Use sparingly. Page section headings should NOT use this class.    */
 .data-label {
-  font-family: var(--font-mono);
-  letter-spacing: 0.08em;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 0.6875rem;
   color: var(--color-ink-muted);
 }
+
+/* ── Nav: sliding underline hover ───────────────────────────────── */
+/*
+  A single 2px gold line slides in from the left on hover and out
+  on leave. Active route keeps it permanently.
+  This is the only motion in the nav — everything else is colour only.
+  The ::after pseudo is the line. transform: scaleX() drives the slide.
+*/
+.nav-link {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.nav-link::after {
+  content: '';
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--color-gold);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 2px;
+}
+
+.nav-link:hover::after,
+.nav-link--active::after {
+  transform: scaleX(1);
+}
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+.hero-section {
+  position: relative;
+  overflow: hidden;
+  background-color: #0c0b09;
+}
+
+@keyframes heroZoom {
+  from { transform: scale(1.06); }
+  to   { transform: scale(1.00); }
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--hero-scrim-top)    0%,
+    var(--hero-scrim-mid)   55%,
+    var(--hero-scrim-bottom) 100%
+  );
+}
+
+.hero-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right,  rgba(0,0,0,0.32) 0%, transparent 28%),
+    linear-gradient(to left,   rgba(0,0,0,0.22) 0%, transparent 28%);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Gallery card hover ──────────────────────────────────────────── */
+.photo-card {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+              box-shadow 0.3s ease;
+}
+.photo-card:hover {
+  transform: translateY(-2px) scale(1.003);
+  box-shadow:
+    0 0 0 1px rgba(var(--color-gold-rgb), 0.45),
+    0 10px 36px rgba(0,0,0,0.20);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-gold-dim); }
+
+/* ── Selection ───────────────────────────────────────────────────── */
+::selection {
+  background: rgba(var(--color-gold-rgb), 0.22);
+  color: var(--color-ink);
+}
+
+/* ── Section alt bg ──────────────────────────────────────────────── */
+.section-alt { background-color: var(--color-canvas-raised); }

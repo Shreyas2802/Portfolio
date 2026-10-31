@@ -80,6 +80,21 @@ export async function apiAuthPutJson<TBody, TResponse>(path: string, body: TBody
   return (await res.json()) as TResponse
 }
 
+/**
+ * Authenticated JSON PUT returning void (204 No Content).
+ * Used for operations like set-hero that return NoContent on success.
+ */
+export async function apiAuthPut<TBody>(path: string, body: TBody): Promise<void> {
+  const res = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ApiError(`PUT ${path} failed`, res.status)
+  }
+}
+
 /** Authenticated multipart/form-data POST - for the photo upload endpoint. */
 export async function apiAuthPostForm<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`/api${path}`, {

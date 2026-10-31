@@ -17,7 +17,7 @@ test.describe('Public site - visitor flows', () => {
     await firstPhoto.click()
 
     await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByRole('button', { name: /close/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Close (Esc)' })).toBeVisible()
 
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).not.toBeVisible()

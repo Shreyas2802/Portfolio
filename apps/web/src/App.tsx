@@ -10,19 +10,13 @@ import { ContactPage } from './routes/ContactPage'
 import { ProtectedRoute } from './components/admin/ProtectedRoute'
 import { AuthProvider } from './features/auth/AuthContext'
 
-// Everything under /admin is code-split into its own chunk (Phase 8 -
-// "bundle analysis"). A public visitor browsing the portfolio never
-// downloads any of this JS; it only loads the moment someone actually
-// navigates to /admin/*. The public site and the admin panel are used
-// by entirely different people (visitors vs. the site owner), so
-// there's no reason the former should pay the download cost for the
-// latter.
 const LoginPage = lazy(() => import('./routes/admin/LoginPage').then((m) => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('./routes/admin/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const PhotosAdminPage = lazy(() => import('./routes/admin/PhotosAdminPage').then((m) => ({ default: m.PhotosAdminPage })))
 const AlbumsAdminPage = lazy(() => import('./routes/admin/AlbumsAdminPage').then((m) => ({ default: m.AlbumsAdminPage })))
 const TaxonomyAdminPage = lazy(() => import('./routes/admin/TaxonomyAdminPage').then((m) => ({ default: m.TaxonomyAdminPage })))
 const ProjectsAdminPage = lazy(() => import('./routes/admin/ProjectsAdminPage').then((m) => ({ default: m.ProjectsAdminPage })))
+const MessagesAdminPage = lazy(() => import('./routes/admin/MessagesAdminPage').then((m) => ({ default: m.MessagesAdminPage })))
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
 
 function AdminFallback() {
@@ -66,6 +60,7 @@ const router = createBrowserRouter([
           { path: 'albums', element: <Suspense fallback={<AdminFallback />}><AlbumsAdminPage /></Suspense> },
           { path: 'taxonomy', element: <Suspense fallback={<AdminFallback />}><TaxonomyAdminPage /></Suspense> },
           { path: 'projects', element: <Suspense fallback={<AdminFallback />}><ProjectsAdminPage /></Suspense> },
+          { path: 'messages', element: <Suspense fallback={<AdminFallback />}><MessagesAdminPage /></Suspense> },
         ],
       },
     ],

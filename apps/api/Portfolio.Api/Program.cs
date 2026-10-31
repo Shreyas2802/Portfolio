@@ -27,7 +27,7 @@ var builder = WebApplication.CreateBuilder(args);
 // one already-guarded upload action.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30 MB
+    options.Limits.MaxRequestBodySize = 104857600; // 100 MB
 });
 
 // --- Services -------------------------------------------------------
@@ -145,6 +145,8 @@ builder.Services.AddScoped<IAdminQueryService, AdminQueryService>();
 // (unchanged dev behavior). In production this should point outside the
 // deployed app's publish folder - see the deployment guide.
 builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+
+builder.Services.Configure<WatermarkOptions>(builder.Configuration.GetSection("Watermark"));
 
 // Compress JSON API responses - the spec's "Compress HTTP responses"
 // bullet. Static image variants under /uploads are already compressed

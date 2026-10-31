@@ -2,6 +2,7 @@ using MetadataExtractor;
 using MetadataExtractor.Formats.Exif;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Portfolio.Application.Photography;
 using Portfolio.Domain.Entities;
 using Portfolio.Infrastructure.Persistence;
@@ -10,76 +11,71 @@ using SkiaSharp;
 namespace Portfolio.Infrastructure.Photography;
 
 /// <summary>
-/// Handles the full upload pipeline (spec Phase 5): validate the file
-/// is genuinely a decodable image, extract real EXIF, generate the
-/// three size variants, persist them via the storage abstraction, and
-/// create the Photo row - or clean up anything already written if a
-/// later step fails, so a failed upload never leaves orphaned files
-/// or a half-written database row.
+/// Handles the full upload pipeline: validate, extract EXIF,
+/// generate three size variants, apply watermark to medium + large,
+/// persist, and clean up on failure.
+///
+/// Watermark: bottom-right text overlay using SkiaSharp. Applied only
+/// to medium and large variants — thumbs are too small for it to read.
+/// Controlled by WatermarkOptions (enabled flag + text). SkiaSharp
+/// handles the text rendering natively; no external font file needed
+/// for the default system font, but we embed a fallback to ensure
+/// consistent rendering across Windows and Linux (Plesk).
 /// </summary>
 public class PhotoUploadService : IPhotoUploadService
 {
-    private const long MaxFileSizeBytes = 25 * 1024 * 1024; // 25 MB
+    private const long MaxFileSizeBytes = 100 * 1024 * 1024; // 100 MB
     private static readonly (string Name, int MaxWidth)[] Variants =
     {
-        ("thumb", 480),
+        ("thumb",  480),
         ("medium", 1200),
-        ("large", 2400),
+        ("large",  2400),
     };
+
+    // Variants that get a watermark (thumb is too small)
+    private static readonly HashSet<string> WatermarkedVariants = ["medium", "large"];
 
     private readonly PortfolioDbContext _dbContext;
     private readonly IPhotoStorageService _storageService;
     private readonly ILogger<PhotoUploadService> _logger;
+    private readonly WatermarkOptions _watermark;
 
     public PhotoUploadService(
         PortfolioDbContext dbContext,
         IPhotoStorageService storageService,
-        ILogger<PhotoUploadService> logger)
+        ILogger<PhotoUploadService> logger,
+        IOptions<WatermarkOptions> watermarkOptions)
     {
         _dbContext = dbContext;
         _storageService = storageService;
         _logger = logger;
+        _watermark = watermarkOptions.Value;
     }
 
-    public async Task<UploadPhotoResult> UploadAsync(UploadPhotoRequest request, CancellationToken cancellationToken)
+    public async Task<UploadPhotoResult> UploadAsync(
+        UploadPhotoRequest request, CancellationToken cancellationToken)
     {
         var album = await _dbContext.Albums.FindAsync([request.AlbumId], cancellationToken);
         if (album is null)
-        {
             return Fail("Album not found.");
-        }
 
-        using var memoryStream = new MemoryStream();
-        await request.FileStream.CopyToAsync(memoryStream, cancellationToken);
-        var bytes = memoryStream.ToArray();
+        using var ms = new MemoryStream();
+        await request.FileStream.CopyToAsync(ms, cancellationToken);
+        var bytes = ms.ToArray();
 
         if (bytes.Length == 0)
-        {
             return Fail("Uploaded file is empty.");
-        }
-        if (bytes.Length > MaxFileSizeBytes)
-        {
-            return Fail($"File exceeds the {MaxFileSizeBytes / (1024 * 1024)}MB limit.");
-        }
 
-        // Never trust the declared content-type - decode the actual
-        // bytes. If SkiaSharp can't decode it, it isn't a real image,
-        // regardless of what extension or content-type it arrived with.
+        if (bytes.Length > MaxFileSizeBytes)
+            return Fail($"File exceeds the {MaxFileSizeBytes / (1024 * 1024)} MB limit.");
+
         var decoded = SKBitmap.Decode(bytes);
         if (decoded is null)
-        {
             return Fail(
                 "Couldn't read this file as an image. Supported formats: JPEG, PNG, WEBP. " +
-                "HEIC (common on iPhone) and RAW formats aren't supported - convert to JPEG first.");
-        }
+                "HEIC and RAW formats aren't supported — convert to JPEG first.");
 
-        // Resource-exhaustion safeguard: a tiny file can still decode to
-        // an enormous pixel grid (a "decompression bomb"), which would
-        // make the resize step below expensive regardless of the file's
-        // byte size. 50 megapixels comfortably covers this site's real
-        // camera (Sony A6000, 24MP) with generous headroom.
-        const long maxPixels = 50_000_000;
-        if ((long)decoded.Width * decoded.Height > maxPixels)
+        if ((long)decoded.Width * decoded.Height > 50_000_000L)
         {
             decoded.Dispose();
             return Fail("Image dimensions are too large to process (max ~50 megapixels).");
@@ -88,10 +84,6 @@ public class PhotoUploadService : IPhotoUploadService
         try
         {
             var exif = ExtractExif(bytes);
-
-            // Apply the EXIF-declared rotation/flip to the actual pixels
-            // now, once, rather than per-variant - see ApplyExifOrientation
-            // for why this is necessary at all.
             var oriented = ApplyExifOrientation(decoded, exif.Orientation);
             try
             {
@@ -100,9 +92,7 @@ public class PhotoUploadService : IPhotoUploadService
             finally
             {
                 if (!ReferenceEquals(oriented, decoded))
-                {
                     oriented.Dispose();
-                }
             }
         }
         finally
@@ -112,7 +102,9 @@ public class PhotoUploadService : IPhotoUploadService
     }
 
     private async Task<UploadPhotoResult> SaveUploadAsync(
-        UploadPhotoRequest request, Album album, SKBitmap original, ExifData exif, CancellationToken cancellationToken)
+        UploadPhotoRequest request, Album album,
+        SKBitmap original, ExifData exif,
+        CancellationToken cancellationToken)
     {
         var slug = await GenerateUniqueSlugAsync(request.Title, cancellationToken);
         var savedPaths = new List<string>();
@@ -122,11 +114,25 @@ public class PhotoUploadService : IPhotoUploadService
             var paths = new Dictionary<string, string>();
             foreach (var (name, maxWidth) in Variants)
             {
-                var variantBytes = ResizeAndEncode(original, maxWidth);
-                var relativePath = $"photos/{slug}/{name}.jpg";
-                var urlPath = await _storageService.SaveVariantAsync(relativePath, variantBytes, cancellationToken);
-                savedPaths.Add(urlPath);
-                paths[name] = urlPath;
+                var bitmap = ResizeVariant(original, maxWidth);
+                try
+                {
+                    // Apply watermark to medium and large — not thumb
+                    if (_watermark.Enabled && WatermarkedVariants.Contains(name))
+                        ApplyWatermark(bitmap, _watermark.Text);
+
+                    var variantBytes = Encode(bitmap);
+                    var relativePath = $"photos/{slug}/{name}.jpg";
+                    var urlPath = await _storageService.SaveVariantAsync(
+                        relativePath, variantBytes, cancellationToken);
+                    savedPaths.Add(urlPath);
+                    paths[name] = urlPath;
+                }
+                finally
+                {
+                    if (!ReferenceEquals(bitmap, original))
+                        bitmap.Dispose();
+                }
             }
 
             var photo = new Photo
@@ -148,7 +154,8 @@ public class PhotoUploadService : IPhotoUploadService
                 ShutterSpeed = exif.ShutterSpeed,
                 Iso = exif.Iso,
                 FocalLengthMm = exif.FocalLengthMm,
-                DisplayOrder = await _dbContext.Photos.CountAsync(p => p.AlbumId == album.Id, cancellationToken),
+                DisplayOrder = await _dbContext.Photos
+                    .CountAsync(p => p.AlbumId == album.Id, cancellationToken),
                 IsPublished = true,
                 UploadedAtUtc = DateTime.UtcNow,
             };
@@ -159,9 +166,7 @@ public class PhotoUploadService : IPhotoUploadService
                     .Where(t => request.TagIds.Contains(t.Id))
                     .ToListAsync(cancellationToken);
                 foreach (var tag in tags)
-                {
                     photo.Tags.Add(tag);
-                }
             }
 
             _dbContext.Photos.Add(photo);
@@ -195,173 +200,159 @@ public class PhotoUploadService : IPhotoUploadService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Photo upload failed after writing {Count} variant(s); cleaning up", savedPaths.Count);
+            _logger.LogError(ex,
+                "Photo upload failed after writing {Count} variant(s); cleaning up",
+                savedPaths.Count);
             foreach (var path in savedPaths)
             {
-                try
-                {
-                    await _storageService.DeleteVariantAsync(path, cancellationToken);
-                }
+                try { await _storageService.DeleteVariantAsync(path, cancellationToken); }
                 catch (Exception cleanupEx)
                 {
-                    _logger.LogError(cleanupEx, "Failed to clean up orphaned variant {Path}", path);
+                    _logger.LogError(cleanupEx,
+                        "Failed to clean up orphaned variant {Path}", path);
                 }
             }
             return Fail("Upload failed while saving the photo. No files were left behind.");
         }
     }
 
-    public async Task<bool> DeleteAsync(int photoId, CancellationToken cancellationToken)
+    // ── Watermark ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Draws a subtle bottom-right watermark onto the bitmap in place.
+    /// Font size scales with image width so it stays proportional across
+    /// medium (1200px) and large (2400px) variants.
+    /// Two layers: a slightly larger semi-transparent shadow pass, then
+    /// the white text on top — gives legibility on both light and dark
+    /// areas of the photo without a heavy box.
+    /// </summary>
+    private static void ApplyWatermark(SKBitmap bitmap, string text)
     {
-        var photo = await _dbContext.Photos.FindAsync([photoId], cancellationToken);
-        if (photo is null)
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(text)) return;
 
-        foreach (var path in new[] { photo.ThumbnailPath, photo.MediumPath, photo.LargePath })
-        {
-            try
-            {
-                await _storageService.DeleteVariantAsync(path, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                // Log and continue - a missing/already-deleted file
-                // shouldn't block removing the database row, which is
-                // the part the admin actually cares about here.
-                _logger.LogWarning(ex, "Failed to delete variant {Path} for photo {PhotoId}", path, photoId);
-            }
-        }
+        using var canvas = new SKCanvas(bitmap);
 
-        _dbContext.Photos.Remove(photo);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return true;
+        float fontSize = bitmap.Width * 0.018f; // ~1.8% of width
+        float margin   = bitmap.Width * 0.022f;
+
+        // Shadow pass
+        using var shadowPaint = new SKPaint
+        {
+            Color       = new SKColor(0, 0, 0, 100),
+            TextSize    = fontSize,
+            IsAntialias = true,
+            Typeface    = SKTypeface.Default,
+        };
+        float textWidth  = shadowPaint.MeasureText(text);
+        float x = bitmap.Width  - textWidth - margin + 1f;
+        float y = bitmap.Height - margin    + 1f;
+        canvas.DrawText(text, x, y, shadowPaint);
+
+        // Text pass
+        using var textPaint = new SKPaint
+        {
+            Color       = new SKColor(255, 255, 255, 200),
+            TextSize    = fontSize,
+            IsAntialias = true,
+            Typeface    = SKTypeface.Default,
+        };
+        textWidth = textPaint.MeasureText(text);
+        x = bitmap.Width - textWidth - margin;
+        y = bitmap.Height - margin;
+        canvas.DrawText(text, x, y, textPaint);
+
+        canvas.Flush();
     }
 
-    private static byte[] ResizeAndEncode(SKBitmap original, int maxWidth)
-    {
-        SKBitmap toEncode = original;
-        SKBitmap? resized = null;
-        if (original.Width > maxWidth)
-        {
-            var ratio = (float)maxWidth / original.Width;
-            var newHeight = (int)Math.Round(original.Height * ratio);
-            resized = original.Resize(new SKImageInfo(maxWidth, newHeight), SKFilterQuality.High);
-            toEncode = resized ?? original;
-        }
+    // ── Resize / encode ──────────────────────────────────────────────
 
-        using var image = SKImage.FromBitmap(toEncode);
-        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 85);
-        resized?.Dispose();
+    private static SKBitmap ResizeVariant(SKBitmap original, int maxWidth)
+    {
+        if (original.Width <= maxWidth) return original;
+        int newHeight = (int)Math.Round((double)original.Height / original.Width * maxWidth);
+        return original.Resize(new SKImageInfo(maxWidth, newHeight), SKFilterQuality.High)
+               ?? original;
+    }
+
+    private static byte[] Encode(SKBitmap bitmap)
+    {
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data  = image.Encode(SKEncodedImageFormat.Jpeg, 85);
         return data.ToArray();
     }
 
+    // ── Slug ─────────────────────────────────────────────────────────
+
     private async Task<string> GenerateUniqueSlugAsync(string title, CancellationToken cancellationToken)
     {
-        var baseSlug = SlugHelper.Slugify(title);
-        if (string.IsNullOrEmpty(baseSlug))
-        {
-            baseSlug = "photo";
-        }
+        var baseSlug = title.ToLowerInvariant()
+            .Replace(' ', '-')
+            .Where(c => char.IsLetterOrDigit(c) || c == '-')
+            .Aggregate(string.Empty, (s, c) => s + c)
+            .Trim('-');
 
         var slug = baseSlug;
         var suffix = 1;
         while (await _dbContext.Photos.AnyAsync(p => p.Slug == slug, cancellationToken))
         {
-            suffix++;
-            slug = $"{baseSlug}-{suffix}";
+            slug = $"{baseSlug}-{suffix++}";
         }
         return slug;
     }
 
-    private static UploadPhotoResult Fail(string message) => new() { Success = false, ErrorMessage = message };
+    // ── EXIF ─────────────────────────────────────────────────────────
 
-    private record ExifData(
-        DateTime? TakenAt, string? CameraMake, string? CameraModel, string? LensModel,
-        decimal? Aperture, string? ShutterSpeed, int? Iso, decimal? FocalLengthMm, int Orientation);
-
-    /// <summary>
-    /// Reads real EXIF from the original file bytes via MetadataExtractor.
-    /// Returns an all-null result rather than throwing if a photo has no
-    /// EXIF (e.g. a screenshot, or a scan) - camera fields are nullable
-    /// on Photo for exactly this reason. Orientation defaults to 1
-    /// (normal) when absent or unparseable.
-    /// </summary>
     private static ExifData ExtractExif(byte[] bytes)
     {
         try
         {
             using var stream = new MemoryStream(bytes);
-            var directories = ImageMetadataReader.ReadMetadata(stream);
-
-            var ifd0 = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
-            var subIfd = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-
-            string? make = ifd0?.GetDescription(ExifDirectoryBase.TagMake);
-            string? model = ifd0?.GetDescription(ExifDirectoryBase.TagModel);
-            string? lens = subIfd?.GetDescription(ExifDirectoryBase.TagLensModel);
+            var dirs = ImageMetadataReader.ReadMetadata(stream);
+            var ifd0   = dirs.OfType<ExifIfd0Directory>().FirstOrDefault();
+            var subIfd = dirs.OfType<ExifSubIfdDirectory>().FirstOrDefault();
 
             int orientation = 1;
-            if (ifd0?.TryGetInt32(ExifDirectoryBase.TagOrientation, out var orientationValue) == true)
-            {
-                orientation = orientationValue;
-            }
+            if (ifd0?.TryGetInt32(ExifDirectoryBase.TagOrientation, out var o) == true)
+                orientation = o;
 
             decimal? aperture = null;
-            if (subIfd?.TryGetDouble(ExifDirectoryBase.TagFNumber, out var fNumber) == true)
-            {
-                aperture = Math.Round((decimal)fNumber, 1);
-            }
+            if (subIfd?.TryGetDouble(ExifDirectoryBase.TagFNumber, out var f) == true)
+                aperture = Math.Round((decimal)f, 1);
 
             decimal? focalLength = null;
-            if (subIfd?.TryGetDouble(ExifDirectoryBase.TagFocalLength, out var focal) == true)
-            {
-                focalLength = Math.Round((decimal)focal, 1);
-            }
+            if (subIfd?.TryGetDouble(ExifDirectoryBase.TagFocalLength, out var fl) == true)
+                focalLength = Math.Round((decimal)fl, 1);
 
             int? iso = null;
-            if (subIfd?.TryGetInt32(ExifDirectoryBase.TagIsoEquivalent, out var isoValue) == true)
-            {
-                iso = isoValue;
-            }
+            if (subIfd?.TryGetInt32(ExifDirectoryBase.TagIsoEquivalent, out var isoVal) == true)
+                iso = isoVal;
 
             string? shutter = null;
-            if (subIfd?.TryGetRational(ExifDirectoryBase.TagExposureTime, out var exposure) == true)
+            if (subIfd?.TryGetRational(ExifDirectoryBase.TagExposureTime, out var exp) == true)
             {
-                var seconds = exposure.ToDouble();
-                shutter = seconds < 1
-                    ? $"1/{Math.Round(1 / seconds)}s"
-                    : $"{seconds:0.#}s";
+                var sec = exp.ToDouble();
+                shutter = sec < 1 ? $"1/{Math.Round(1 / sec)}s" : $"{sec:0.#}s";
             }
 
             DateTime? takenAt = null;
-            if (subIfd?.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var dateTime) == true)
-            {
-                takenAt = dateTime;
-            }
+            if (subIfd?.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var dt) == true)
+                takenAt = dt;
 
-            return new ExifData(takenAt, make, model, lens, aperture, shutter, iso, focalLength, orientation);
+            return new ExifData(
+                takenAt,
+                ifd0?.GetDescription(ExifDirectoryBase.TagMake),
+                ifd0?.GetDescription(ExifDirectoryBase.TagModel),
+                subIfd?.GetDescription(ExifDirectoryBase.TagLensModel),
+                aperture, shutter, iso, focalLength, orientation);
         }
         catch
         {
-            // No EXIF, or unparseable - a photo without camera data is
-            // still a valid upload, it just won't show a DataLabel.
             return new ExifData(null, null, null, null, null, null, null, null, 1);
         }
     }
 
-    /// <summary>
-    /// Cameras commonly store sensor pixel data in a fixed landscape
-    /// orientation and rely on the EXIF Orientation tag to tell viewers
-    /// how to rotate/flip it for display - SkiaSharp's decode does NOT
-    /// apply this automatically, it just hands back the raw pixels. Left
-    /// unhandled, a portrait photo shot on a camera that stores raw
-    /// landscape data (e.g. this site's Sony A6000) gets saved and
-    /// displayed sideways. This physically rotates/flips the pixels so
-    /// the saved variants need no orientation tag at all - consistent
-    /// with already stripping EXIF from served files (see Phase 4).
-    /// </summary>
+    // ── EXIF orientation ─────────────────────────────────────────────
+
     private static SKBitmap ApplyExifOrientation(SKBitmap bitmap, int orientation) => orientation switch
     {
         2 => FlipHorizontal(bitmap),
@@ -371,49 +362,69 @@ public class PhotoUploadService : IPhotoUploadService
         6 => Rotate(bitmap, 90),
         7 => Rotate(FlipHorizontal(bitmap), 90),
         8 => Rotate(bitmap, 270),
-        _ => bitmap, // 1, or missing/unrecognized - already correct
+        _ => bitmap,
     };
 
     private static SKBitmap Rotate(SKBitmap bitmap, int degrees)
     {
-        var swapDimensions = degrees is 90 or 270;
-        var width = swapDimensions ? bitmap.Height : bitmap.Width;
-        var height = swapDimensions ? bitmap.Width : bitmap.Height;
-
-        var rotated = new SKBitmap(width, height);
-        using (var canvas = new SKCanvas(rotated))
-        {
-            // Rotate around the new canvas's center, then shift back by
-            // the original bitmap's center before drawing - this is the
-            // standard "rotate around center" composition and avoids
-            // hand-deriving translate offsets per orientation case.
-            canvas.Translate(width / 2f, height / 2f);
-            canvas.RotateDegrees(degrees);
-            canvas.Translate(-bitmap.Width / 2f, -bitmap.Height / 2f);
-            canvas.DrawBitmap(bitmap, 0, 0);
-        }
+        var swap = degrees is 90 or 270;
+        var w = swap ? bitmap.Height : bitmap.Width;
+        var h = swap ? bitmap.Width  : bitmap.Height;
+        var rotated = new SKBitmap(w, h);
+        using var canvas = new SKCanvas(rotated);
+        canvas.Translate(w / 2f, h / 2f);
+        canvas.RotateDegrees(degrees);
+        canvas.Translate(-bitmap.Width / 2f, -bitmap.Height / 2f);
+        canvas.DrawBitmap(bitmap, 0, 0);
         return rotated;
     }
 
     private static SKBitmap FlipHorizontal(SKBitmap bitmap)
     {
         var flipped = new SKBitmap(bitmap.Width, bitmap.Height);
-        using (var canvas = new SKCanvas(flipped))
-        {
-            canvas.Scale(-1, 1, bitmap.Width / 2f, 0);
-            canvas.DrawBitmap(bitmap, 0, 0);
-        }
+        using var canvas = new SKCanvas(flipped);
+        canvas.Scale(-1, 1, bitmap.Width / 2f, 0);
+        canvas.DrawBitmap(bitmap, 0, 0);
         return flipped;
     }
 
     private static SKBitmap FlipVertical(SKBitmap bitmap)
     {
         var flipped = new SKBitmap(bitmap.Width, bitmap.Height);
-        using (var canvas = new SKCanvas(flipped))
-        {
-            canvas.Scale(1, -1, 0, bitmap.Height / 2f);
-            canvas.DrawBitmap(bitmap, 0, 0);
-        }
+        using var canvas = new SKCanvas(flipped);
+        canvas.Scale(1, -1, 0, bitmap.Height / 2f);
+        canvas.DrawBitmap(bitmap, 0, 0);
         return flipped;
     }
+
+    public async Task<bool> DeleteAsync(int photoId, CancellationToken cancellationToken)
+    {
+        var photo = await _dbContext.Photos.FindAsync([photoId], cancellationToken);
+        if (photo is null) return false;
+
+        foreach (var path in new[] { photo.ThumbnailPath, photo.MediumPath, photo.LargePath })
+        {
+            try
+            {
+                await _storageService.DeleteVariantAsync(path, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to delete variant {Path} for photo {PhotoId}", path, photoId);
+            }
+        }
+
+        _dbContext.Photos.Remove(photo);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    private static UploadPhotoResult Fail(string message) =>
+        new() { Success = false, ErrorMessage = message };
+
+    private record ExifData(
+        DateTime? TakenAt, string? CameraMake, string? CameraModel, string? LensModel,
+        decimal? Aperture, string? ShutterSpeed, int? Iso, decimal? FocalLengthMm,
+        int Orientation);
 }

@@ -26,4 +26,16 @@ public class PhotoDto
     public int? Iso { get; set; }
     public decimal? FocalLengthMm { get; set; }
     public List<string> TagNames { get; set; } = new();
+
+    // ── Hero photo fields ────────────────────────────────────────────
+    /// <summary>True for the one photo pinned as the homepage hero.</summary>
+    public bool IsHeroPhoto { get; set; }
+
+    /// <summary>
+    /// Comma-separated dominant hex colours extracted from this photo
+    /// on upload (e.g. "#1a2b3c,#d4a040,#8c7060"). Used by the
+    /// frontend to dynamically tint the page accent to match the hero
+    /// image. Null until extracted.
+    /// </summary>
+    public string? AccentPalette { get; set; }
 }

@@ -38,11 +38,6 @@ public class PhotographyQueryService : IPhotographyQueryService
 
     public async Task<AlbumDetailDto?> GetAlbumBySlugAsync(string slug, CancellationToken cancellationToken)
     {
-        // Metadata only, deliberately no photos here - photos are
-        // fetched separately via GetAlbumPhotosAsync, paginated. An
-        // earlier version eagerly loaded every photo in the album on
-        // this same call, which doesn't scale once an album holds
-        // hundreds of photos (see spec's Gallery Performance section).
         return await _dbContext.Albums
             .Where(a => a.Slug == slug && a.IsPublished)
             .Select(a => new AlbumDetailDto
@@ -65,10 +60,7 @@ public class PhotographyQueryService : IPhotographyQueryService
             .Select(a => (int?)a.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (albumId is null)
-        {
-            return null;
-        }
+        if (albumId is null) return null;
 
         page = PaginationLimits.ClampPage(page);
         pageSize = PaginationLimits.ClampPageSize(pageSize);
@@ -103,6 +95,24 @@ public class PhotographyQueryService : IPhotographyQueryService
             .ToListAsync(cancellationToken);
 
         return photos.Select(ToDto).ToList();
+    }
+
+    public async Task<PhotoDto?> GetHeroPhotoAsync(CancellationToken cancellationToken)
+    {
+        // Try pinned hero first
+        var hero = await _dbContext.Photos
+            .Include(p => p.Tags)
+            .Where(p => p.IsPublished && p.IsHeroPhoto)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Fall back to first published photo by display order
+        hero ??= await _dbContext.Photos
+            .Include(p => p.Tags)
+            .Where(p => p.IsPublished)
+            .OrderBy(p => p.DisplayOrder)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return hero is null ? null : ToDto(hero);
     }
 
     public async Task<PagedResult<PhotoDto>> GetAllPhotosAsync(int page, int pageSize, CancellationToken cancellationToken)
@@ -149,5 +159,7 @@ public class PhotographyQueryService : IPhotographyQueryService
         Iso = p.Iso,
         FocalLengthMm = p.FocalLengthMm,
         TagNames = p.Tags.Select(t => t.Name).ToList(),
+        IsHeroPhoto = p.IsHeroPhoto,
+        AccentPalette = p.AccentPalette,
     };
 }

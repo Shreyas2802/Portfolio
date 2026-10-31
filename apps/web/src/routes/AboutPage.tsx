@@ -1,5 +1,3 @@
-import { DataLabel } from '../components/ui/DataLabel'
-
 const EXPERIENCE = [
   {
     role: 'Junior Software Developer',
@@ -17,7 +15,7 @@ const EXPERIENCE = [
     org: 'Vistrut Technologies',
     period: 'Oct 2024 — Apr 2025',
     points: [
-      'Redesigned and optimized a client website, improving UI/UX and responsiveness.',
+      'Redesigned and optimised a client website, improving UI/UX and responsiveness.',
       'Integrated the Razorpay payment gateway and FullCalendar for event management.',
       'Worked directly with the client to implement new features and resolve reported bugs.',
       'Deployed websites to live servers and managed client-side updates.',
@@ -37,7 +35,7 @@ const EDUCATION = [
     degree: 'B.Tech, Computer Engineering',
     school: 'Ajeenkya DY Patil College of Engineering',
     period: 'Nov 2021 — May 2024',
-    detail: 'CGPA: 7.24',
+    detail: 'CGPA 7.24',
   },
   {
     degree: 'Diploma, Computer Engineering',
@@ -50,48 +48,62 @@ const EDUCATION = [
 export function AboutPage() {
   return (
     <>
+      {/* ── Intro ──────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[1600px] px-6 py-24 sm:px-10">
-        <DataLabel items={['ABOUT']} />
-        <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-          Full-stack .NET developer, and a photographer before that.
+        <h1 className="max-w-3xl text-4xl font-semibold leading-[1.12] tracking-tight text-[var(--color-ink)] sm:text-5xl">
+          Full-stack .NET developer,
+          <br className="hidden sm:block" /> and photographer before that.
         </h1>
-        <p className="mt-6 max-w-2xl text-lg text-[var(--color-ink-muted)]">
-          I work across ASP.NET Core Web APIs, SQL Server, and authentication/authorization
-          systems, plus front-end development, deployment, and QA — the full lifecycle of
-          getting software into production. I'm currently contributing to the requirements,
-          UI implementation, and testing of a multi-tenant authentication platform, from
-          early development through MVP.
-        </p>
-        <p className="mt-4 max-w-2xl text-[var(--color-ink-muted)]">
-          Before any of that, I was Photography Committee Head at MIT Polytechnic and
-          Ajeenkya DY Patil University — leading event photography and coordinating student
-          volunteers through academic and cultural events. This site is where both sides
-          live together.
-        </p>
+
+        <div className="mt-8 max-w-2xl space-y-4 text-[1.0625rem] leading-relaxed text-[var(--color-ink-muted)]">
+          <p>
+            I work across ASP.NET Core APIs, SQL Server, and auth systems — through
+            to front-end, deployment, and QA. The full lifecycle of getting software
+            into production, not just one layer of it. Right now I'm contributing
+            to the requirements, UI, and testing of a multi-tenant authentication
+            platform at Vistrut Technologies.
+          </p>
+          <p>
+            Before any of that, I was Photography Committee Head at MIT Polytechnic
+            and Ajeenkya DY Patil University — leading event photography and
+            coordinating volunteers through academic and cultural events. This site
+            is where both sides live together.
+          </p>
+        </div>
+
         <a
           href="/documents/Shreyas_Gune_Resume.pdf"
           target="_blank"
           rel="noreferrer"
-          className="mt-8 inline-block rounded-full bg-[var(--color-ink)] px-6 py-3 text-sm font-medium text-[var(--color-canvas)] transition-opacity hover:opacity-90"
+          className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--color-ink)] px-6 py-3 text-sm font-semibold text-[var(--color-canvas)] transition-opacity hover:opacity-85"
         >
-          Download Resume (PDF)
+          Download Resume
         </a>
       </section>
 
-      <section className="border-t border-[var(--color-line)] px-6 py-24 sm:px-10">
+      {/* ── Experience ─────────────────────────────────────────────── */}
+      <section className="border-t border-[var(--color-line)] px-6 py-20 sm:px-10">
         <div className="mx-auto max-w-[1600px]">
-          <DataLabel items={['EXPERIENCE']} />
-          <div className="mt-8 flex flex-col gap-12">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-faint)]">
+            Experience
+          </h2>
+          <div className="mt-10 flex flex-col divide-y divide-[var(--color-line)]">
             {EXPERIENCE.map((job) => (
-              <div key={job.role} className="grid gap-2 sm:grid-cols-[1fr_2fr] sm:gap-8">
-                <div>
-                  <p className="font-medium text-[var(--color-ink)]">{job.role}</p>
-                  <p className="text-sm text-[var(--color-ink-muted)]">{job.org}</p>
-                  <p className="data-label mt-1">{job.period}</p>
+              <div key={job.role} className="grid gap-6 py-10 first:pt-0 last:pb-0 sm:grid-cols-[200px_1fr] sm:gap-12">
+                <div className="pt-0.5">
+                  <p className="text-sm font-semibold text-[var(--color-ink)]">{job.role}</p>
+                  <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{job.org}</p>
+                  <p className="mt-1 font-mono text-[0.625rem] uppercase tracking-widest text-[var(--color-ink-faint)]">
+                    {job.period}
+                  </p>
                 </div>
-                <ul className="flex flex-col gap-2 text-[var(--color-ink-muted)]">
+                <ul className="space-y-2.5">
                   {job.points.map((point) => (
-                    <li key={point} className="pl-4 before:float-left before:-ml-4 before:text-[var(--color-brass)] before:content-['—_']">
+                    <li
+                      key={point}
+                      className="flex gap-3 text-[0.9375rem] leading-relaxed text-[var(--color-ink-muted)]"
+                    >
+                      <span className="mt-[0.4em] h-1 w-1 shrink-0 rounded-full bg-[var(--color-gold)]" aria-hidden="true" />
                       {point}
                     </li>
                   ))}
@@ -102,16 +114,21 @@ export function AboutPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-line)] px-6 py-24 sm:px-10">
+      {/* ── Skills ─────────────────────────────────────────────────── */}
+      <section className="section-alt border-t border-[var(--color-line)] px-6 py-20 sm:px-10">
         <div className="mx-auto max-w-[1600px]">
-          <DataLabel items={['SKILLS']} />
-          <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-faint)]">
+            Skills
+          </h2>
+          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(SKILLS).map(([category, items]) => (
               <div key={category}>
-                <p className="data-label mb-3">{category}</p>
-                <ul className="flex flex-col gap-1 text-[var(--color-ink-muted)]">
+                <p className="text-sm font-semibold text-[var(--color-ink)]">{category}</p>
+                <ul className="mt-3 space-y-1.5">
                   {items.map((item) => (
-                    <li key={item}>{item}</li>
+                    <li key={item} className="text-sm text-[var(--color-ink-muted)]">
+                      {item}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -120,15 +137,18 @@ export function AboutPage() {
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-line)] px-6 py-24 sm:px-10">
+      {/* ── Education ──────────────────────────────────────────────── */}
+      <section className="border-t border-[var(--color-line)] px-6 py-20 sm:px-10">
         <div className="mx-auto max-w-[1600px]">
-          <DataLabel items={['EDUCATION']} />
-          <div className="mt-8 grid gap-8 sm:grid-cols-2">
+          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--color-ink-faint)]">
+            Education
+          </h2>
+          <div className="mt-10 grid gap-8 sm:grid-cols-2">
             {EDUCATION.map((ed) => (
               <div key={ed.degree}>
-                <p className="font-medium text-[var(--color-ink)]">{ed.degree}</p>
-                <p className="text-sm text-[var(--color-ink-muted)]">{ed.school}</p>
-                <p className="data-label mt-1">
+                <p className="text-[0.9375rem] font-semibold text-[var(--color-ink)]">{ed.degree}</p>
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{ed.school}</p>
+                <p className="mt-1 font-mono text-[0.625rem] uppercase tracking-widest text-[var(--color-ink-faint)]">
                   {ed.period} · {ed.detail}
                 </p>
               </div>

@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Portfolio.Infrastructure.Persistence;
 
 namespace Portfolio.Tests.Integration;
@@ -47,12 +49,22 @@ public class PortfolioApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<PortfolioDbContext>));
-            if (descriptor is not null)
-            {
-                services.Remove(descriptor);
-            }
+            // AddDbContext registers TWO separate things: a
+            // DbContextOptions<T> singleton, AND a distinct
+            // IDbContextOptionsConfiguration<T> delegate that gets
+            // *replayed* whenever the options are actually built.
+            // Removing only the former (as an earlier version of this
+            // file did) left the latter in place - so when the SQLite
+            // registration below ran, EF Core replayed BOTH the
+            // original UseSqlServer configuration (from Program.cs)
+            // AND this UseSqlite configuration onto the same options
+            // object, producing "two database providers registered".
+            // RemoveAll clears every registration of a given service
+            // type in one call, and is also safer than
+            // SingleOrDefault()+Remove() here, which would throw if
+            // more than one matching descriptor ever existed.
+            services.RemoveAll(typeof(DbContextOptions<PortfolioDbContext>));
+            services.RemoveAll(typeof(IDbContextOptionsConfiguration<PortfolioDbContext>));
 
             _connection.Open();
             services.AddDbContext<PortfolioDbContext>(options => options.UseSqlite(_connection));

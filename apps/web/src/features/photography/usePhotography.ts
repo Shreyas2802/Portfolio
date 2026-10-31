@@ -28,19 +28,23 @@ export function useFeaturedPhotos(count: number) {
 }
 
 /**
- * "Load more" pagination for an album's photos (Phase 8 - the spec
- * requires bounded, server-enforced pagination on collection
- * endpoints; a masonry gallery reads more naturally as incremental
- * loading than numbered pages).
- *
- * Fetches pages 1..currentPage as separate cached queries (via
- * useQueries) and flattens them into one list on each render, rather
- * than accumulating into local state from an effect - React's own
- * guidance is to avoid setState-in-effect where a value can just be
- * derived during render instead (see useDeletePhoto/etc. for the
- * effect-free "adjust state during render" pattern used for the
- * slug-change reset below).
+ * Fetches the pinned hero photo (or first published photo as fallback).
+ * Returns null when there are no photos yet.
+ * Used by HomePage to set the hero background and extract accent palette.
  */
+export function useHeroPhoto() {
+  return useQuery({
+    queryKey: ['hero-photo'],
+    queryFn: async () => {
+      const res = await fetch('/api/photography/hero')
+      if (res.status === 204) return null   // no photos yet
+      if (!res.ok) throw new Error('Failed to fetch hero photo')
+      return res.json() as Promise<Photo>
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useAlbumPhotos(slug: string | undefined) {
   const [page, setPage] = useState(1)
   const [lastSlug, setLastSlug] = useState(slug)

@@ -17,6 +17,9 @@ export interface Photo {
   iso: number | null
   focalLengthMm: number | null
   tagNames: string[]
+  isHeroPhoto: boolean
+  /** Comma-separated hex colours e.g. "#1a2b3c,#d4a040,#8c7060" */
+  accentPalette: string | null
 }
 
 export interface AlbumSummary {

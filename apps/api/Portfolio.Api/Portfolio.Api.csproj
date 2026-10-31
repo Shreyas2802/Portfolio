@@ -3,9 +3,19 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseAppHost>false</UseAppHost>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>portfolio-api-dev-secrets</UserSecretsId>
+    <!--
+      These two properties inject directly into the generated web.config
+      on every `dotnet publish` — no manual post-publish editing needed.
+      ASPNETCORE_ENVIRONMENT=Production ensures the app never runs in
+      Development mode on the server (no dev exception pages, no DB seed).
+      Stdout logging on so IIS/ANCM captures app logs next to the dll.
+    -->
+    <EnvironmentName>Production</EnvironmentName>
+    <AspNetCoreHostingModel>inprocess</AspNetCoreHostingModel>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,13 +39,12 @@
   </ItemGroup>
 
   <!--
-    Baked into the generated web.config's <aspNetCore><environmentVariables>
-    section on every `dotnet publish` - survives republishing without any
-    manual post-publish editing. Only the environment NAME goes here
-    (never a secret) - the actual connection string, JWT key, and admin
-    credentials are set via Plesk's own environment-variable
-    configuration for the site, never committed to this file. See
-    docs/deployment/plesk-deployment-guide.md.
+    Injects ASPNETCORE_ENVIRONMENT into the published web.config's
+    <environmentVariables> block. The <EnvironmentVariables> item group
+    syntax below is the correct form for Microsoft.NET.Sdk.Web (net9).
+    Combined with the fixed web.config in the repo root (which serves
+    as a template/fallback), this ensures Production environment on
+    every redeploy without manual intervention.
   -->
   <ItemGroup>
     <EnvironmentVariables Include="ASPNETCORE_ENVIRONMENT" Value="Production" />

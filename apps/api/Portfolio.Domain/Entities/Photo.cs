@@ -1,18 +1,5 @@
 namespace Portfolio.Domain.Entities;
 
-/// <summary>
-/// A single photo. ThumbnailPath/MediumPath/LargePath point at
-/// pre-generated variants under wwwroot/uploads/photos - hand-generated
-/// for the Phase 4 seed data. The automated version of this (upload ->
-/// validate -> generate variants -> store) is Phase 5's job; this
-/// entity's shape doesn't need to change when that pipeline exists,
-/// it'll just populate these same fields instead of the seeder.
-///
-/// Technical fields (Aperture/ShutterSpeed/Iso/FocalLengthMm/etc.) are
-/// deliberately real EXIF data pulled from the source files rather
-/// than placeholders - this is exactly what the DataLabel UI device
-/// displays on each photo.
-/// </summary>
 public class Photo
 {
     public int Id { get; set; }
@@ -41,6 +28,21 @@ public class Photo
     public int DisplayOrder { get; set; }
     public bool IsPublished { get; set; }
     public DateTime UploadedAtUtc { get; set; }
+
+    /// <summary>
+    /// Exactly one photo can be pinned as the homepage hero.
+    /// The SetHero admin endpoint clears all others before setting this.
+    /// Falls back to the first published photo if none is pinned.
+    /// </summary>
+    public bool IsHeroPhoto { get; set; }
+
+    /// <summary>
+    /// Comma-separated dominant hex colours sampled from the thumbnail
+    /// on upload by the frontend via Canvas API, then saved back via
+    /// the SetHero endpoint. Format: "#1a2b3c,#d4a040,#8c7060".
+    /// Used to dynamically tint the page accent to match the hero image.
+    /// </summary>
+    public string? AccentPalette { get; set; }
 
     public ICollection<Tag> Tags { get; set; } = new List<Tag>();
 }
