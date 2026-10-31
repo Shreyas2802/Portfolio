@@ -26,3 +26,19 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# --- IDE ---
+.vs/
+
+# --- Test output ---
+test-results/
+playwright-report/
+coverage/
+TestResults/
+
+# --- Build / release output ---
+publish/
+artifacts/
+
+# --- Server config with real credentials (use web.config.example) ---
+apps/api/Portfolio.Api/web.config

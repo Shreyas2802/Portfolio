@@ -8,9 +8,9 @@ name: CI
 # server credentials this workflow doesn't have.
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   backend:

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <remove name="WebDAV" />
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+      <security>
+        <requestFiltering>
+          <requestLimits maxAllowedContentLength="104857600" />
+        </requestFiltering>
+      </security>
+      <modules>
+        <remove name="WebDAVModule" />
+      </modules>
+      <aspNetCore processPath="dotnet" arguments=".\Portfolio.Api.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout" hostingModel="inprocess">
+        <environmentVariables>
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="Production" />
+          <environmentVariable name="ConnectionStrings__DefaultConnection" value="Server=YOUR_SQL_HOST;Database=PortfolioDb;User Id=YOUR_DB_USER;Password=YOUR_DB_PASSWORD;TrustServerCertificate=True;" />
+          <environmentVariable name="Jwt__Key" value="GENERATE_A_RANDOM_32+_CHAR_KEY" />
+          <environmentVariable name="Jwt__Issuer" value="PortfolioApi" />
+          <environmentVariable name="Jwt__Audience" value="PortfolioClient" />
+          <environmentVariable name="AdminUser__Username" value="YOUR_ADMIN_USERNAME" />
+          <environmentVariable name="AdminUser__Password" value="YOUR_ADMIN_PASSWORD" />
+          <environmentVariable name="Watermark__Enabled" value="true" />
+          <environmentVariable name="Watermark__Text" value="© Shreyas Gune" />
+        </environmentVariables>
+      </aspNetCore>
+    </system.webServer>
+  </location>
+</configuration>
